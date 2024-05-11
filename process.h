@@ -1,38 +1,52 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
+#include <time.h>
 #include "instruction.h"
 
 #define MAX_PROCESS_NAME 50
-#define MAX_SEMAFOROS 10
+#define QUANTUM_TIME 5000
+
+char NOVO = '0';
+char BLOQUEADO = '1';
+char PRONTO = '2';
+char EXECUTANDO = '3';
+char CONCLUIDO = '4';
 
 
-typedef struct Process{
+typedef struct processo{
     // Cabecalho
-    char name[MAX_PROCESS_NAME];
+    char nome[MAX_PROCESS_NAME];
     int idSegmento;
-    int priority;
+    int prioridade;
     int tamanhoSegmento;
-    int semaforos[MAX_SEMAFOROS];
-    int numSemaforos;
-    int numComandos;
+    char semaforos[MAX_SEMAFOROS];
+    int quantidadeSemaforos;
+
     // Legado
     int id;
-    int remainingTime;
-    int arrivalTime;
-    struct Process *next; // Lista de processos
-} process_t;
+    clock_t tempoRestante;
+    clock_t tempoChegada;
 
-typedef struct lista_circular_processos {
-    process_t *head;
-    process_t *tail;
-    process_t *current;
-} pcb;
+    char estado;
+    int pc;
+    int numComandos;
 
-pcb *add_process(pcb *lista, process_t *processo);
-void readSyntacticProgram(FILE *, process_t**, instruction**);
-process_t* processCreate(int id, const char *name);
-void processInterrupt(pcb *lista);
-void processFinish(pcb *lista);
+    struct processo *prox; // Lista de processos
+} PROCESSO;
+
+typedef struct pcb {
+    PROCESSO *head;
+    PROCESSO *tail;
+    PROCESSO *atual;
+} PCB;
+
+PCB iniciaPCB();
+PCB *add_process(PCB *lista, PROCESSO *processo);
+
+void readSyntheticProgram(FILE *, PROCESSO**, instruction**);
+void processCreate(char *fileName);
+void processInterrupt(PCB *lista);
+void processFinish(PCB *lista);
 
 #endif //PROCESS_H

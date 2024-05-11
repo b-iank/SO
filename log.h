@@ -51,7 +51,7 @@ void disk_log(const char* process_name, const int proc_id,
 typedef struct {
     long w_bytes; // bytes escritos nos arquivos
     long r_bytes; // bytes lidos nos arquivos
-    int p_time; // tempo que um processo está escrevendo
+    int p_time; // tempo que um PROCESSO está escrevendo
 } io_log_t;
 
 typedef enum IoLogType {
