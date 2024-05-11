@@ -3,20 +3,21 @@
 #include <string.h>
 
 #include "process.h"
-
+#include "terminal.c"
 #include "kernel.h"
 #include "memory.h"
 
-void processCreate(char* fileName) {
+
+void processCreate(char *fileName) {
     FILE *fp = fopen(fileName, "r");
-    process_t* process = NULL;
+    PROCESSO *process = NULL;
     instruction *code = NULL;
 
     if (!(fp = fopen(fileName, "r"))) {
         exit(EXIT_FAILURE);
     }
 
-    readSyntacticProgram(fp, &process, &code);
+    readSyntheticProgram(fp, &process, &code);
 
     memoryRequest *memReq = malloc(sizeof(memoryRequest));
     memReq->process = process;
@@ -26,55 +27,84 @@ void processCreate(char* fileName) {
     sysCall(MEMORY_LOAD_REQUEST, (void *) &memReq);
 }
 
+PCB iniciaPCB() {
+    PCB pcb;
+    pcb.head = NULL;
+    pcb.tail = NULL;
+    pcb.atual = NULL;
 
-pcb * add_process(pcb *TCP, process_t *processo) {
-    pcb *lista_aux = TCP;
-    process_t *head = lista_aux->head, *aux = head, *anterior = lista_aux->tail;
+    return pcb;
+}
+
+PCB *add_process(PCB *TCP, PROCESSO *processo) {
+    PCB *lista_aux = TCP;
+    PROCESSO *head = lista_aux->head, *aux = head, *anterior = lista_aux->tail;
 
     if (head == NULL) {
         lista_aux->head = processo;
         lista_aux->tail = processo;
-        processo->next = processo;
+        processo->prox = processo;
         return lista_aux;
     }
 
-    while (processo->priority > aux->priority && aux->next != head) {
+    while (processo->prioridade > aux->prioridade && aux->prox != head) {
         anterior = aux;
-        aux = aux->next;
+        aux = aux->prox;
     }
 
-    processo->next = aux;
-    anterior->next = processo;
+    processo->prox = aux;
+    anterior->prox = processo;
 
-    if (processo->priority < head->priority)
+    if (processo->prioridade < head->prioridade)
         lista_aux->head = processo;
-    if (processo->next == lista_aux->head)
+    if (processo->prox == lista_aux->head)
         lista_aux->tail = processo;
 
     return lista_aux;
 }
 
-void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code)
-{
+void readSyntheticProgram(FILE *arquivo, PROCESSO **process, instruction **code) {
     long int code_section;
-    int i, countCode;
+    int countCode;
     long tamanhoArquivo;
 
-    (*process) = malloc(sizeof(process_t));
+    (*process) = malloc(sizeof(PROCESSO));
 
-    fscanf(arquivo, "%s %d %d %d", (*process)->name, &(*process)->idSegmento, &(*process)->priority,
-        &(*process)->tamanhoSegmento);
+    // Le cabecalho
+    fscanf(arquivo, "%s %d %d %d", (*process)->nome, &(*process)->idSegmento, &(*process)->prioridade,
+           &(*process)->tamanhoSegmento);
 
-    // TODO: adicionar na tabela de semáforos
-    (*process)->numSemaforos = 0;
-    while (1)
-    {
-        int semaforo;
+    (*process)->id = kernel->proxId++; // Pega o próximo id de processo e soma a variável
+    (*process)->pc = 0;
+    (*process)->estado = NOVO;
+    (*process)->tempoRestante = (QUANTUM_TIME / (*process)->prioridade);
+    (*process)->tempoChegada = clock();
+
+    (*process)->quantidadeSemaforos = 0;
+    while (1) {
+        char semaforo;
         if (fscanf(arquivo, "%c", &semaforo) != 1)
             break;
-        (*process)->semaforos[(*process)->numSemaforos++] = semaforo;
+
+        int existe = 0;
+        for (int i = 0; i < (*process)->quantidadeSemaforos; i++) {
+            if ((*process)->semaforos[i] == semaforo) {
+                existe = 1;
+            }
+        }
+
+        if (existe) {
+            char *mensagem = malloc(21);
+            sprintf(mensagem, "Semaforo %c ja existe", semaforo);
+            alerta(mensagem);
+            continue;
+        }
+
+        (*process)->semaforos[(*process)->quantidadeSemaforos++] = semaforo;
+        novoSemaforo(semaforo);
     }
 
+    // Le codigo
     code_section = ftell(arquivo);
     countCode = 0;
     fseek(arquivo, 0, SEEK_END); // Move o ponteiro para o final do arquivo
@@ -89,7 +119,7 @@ void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code
 
     fseek(arquivo, code_section, SEEK_SET);
 
-    (*code) = (instruction *)malloc(sizeof(instruction) * (countCode));
+    (*code) = (instruction *) malloc(sizeof(instruction) * (countCode));
 
     if (!(*code)) {
         printf("Sem memória!\n");
@@ -99,15 +129,13 @@ void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code
     (*process)->numComandos = countCode;
 
     char comando[51];
-    i = 0;
-    while (fgets(comando, 51, arquivo) != NULL)
-    {
+    int i = 0;
+    while (fgets(comando, 51, arquivo) != NULL) {
         if (comando[0] == 'P' || comando[0] == 'V') {
             // TODO: ler semáforo
             printf("aaa");
-        }
-        else { // exec 1000
-            char* left_op = malloc(sizeof(char)*6);
+        } else { // exec 1000
+            char *left_op = malloc(sizeof(char) * 6);
             int right_op;
 
             sscanf(comando, "%s %d", left_op, &right_op);
@@ -130,33 +158,16 @@ void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code
     fclose(arquivo);
 }
 
-process_t *processCreate(int id, const char *name)
-{
-    process_t *new_process = (process_t *)malloc(sizeof(process_t));
-    if (new_process == NULL)
-    {
-        printf("Erro\n");
-        return NULL;
-    }
 
-    new_process->id = id;
-    strncpy(new_process->name, name, MAX_PROCESS_NAME - 1);
-    new_process->name[MAX_PROCESS_NAME - 1] = '\0';
-
-    return new_process;
-}
-
-void processInterrupt(pcb *BCP)
-{
-    printf("Interrupcao do processo %d\n", BCP->current->id);
+void processInterrupt(PCB *BCP) {
+    printf("Interrupcao do PROCESSO %d\n", BCP->atual->id);
     // Realizar as ações necessárias para tratar a interrupção
     // troca de contexto etc
-    if (BCP->current->remainingTime <= 0) {
+    if (BCP->atual->tempoRestante <= 0) {
         processFinish(BCP);
     }
 }
 
-void processFinish(pcb *BCP)
-{
-    printf("Finalizando o processo %d\n", BCP->current->id);
+void processFinish(PCB *BCP) {
+    printf("Finalizando o PROCESSO %d\n", BCP->atual->id);
 }

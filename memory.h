@@ -3,10 +3,10 @@
 
 #include "process.h"
 
-typedef struct {
-    process_t* process;
+typedef struct memoria {
+    PROCESSO* process;
     instruction* code;
-} memoryRequest;
+} MEMORIA;
 
 
 #endif //MEMORY_H

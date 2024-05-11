@@ -6,7 +6,7 @@
 
 #include "list.h"
 
-/* Process Log Related Function Definitions */
+/* processo Log Related Function Definitions */
 
 /**
  * It initializes the process logging subsystem.

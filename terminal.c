@@ -1,11 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "kernel.h"
-#include "list.h"
-#include "process.h"
-
-pcb *BCP;
+#include "terminal.h"
 
 sem_t log_mutex;
 sem_t mem_mutex;
@@ -25,21 +18,17 @@ list_t* res_acq_log_list;
 
 void main_menu() {
     char fileName[31];
-    BCP = malloc(sizeof(pcb));
-    BCP->head = NULL;
-    BCP->tail = NULL;
-    BCP->current = NULL;
 
     int op;
     printf("Menu\n");
-    printf("1 - Executar processo\n");
+    printf("1 - Executar PROCESSO\n");
     printf("2 - Ver processos\n");
     printf("3 - Ver memória\n");
     scanf("%d", &op);
 
     if (op == 1) {
         scanf("%s", fileName);
-        processInterrupt(BCP);
+        processInterrupt(&kernel->pcb);
         sysCall(PROCESS_CREATE, fileName);
     } else if (op == 2) {
         // mostrar
@@ -48,4 +37,12 @@ void main_menu() {
     } else {
         printf("Operação não suportada\n");
     }
+}
+
+void alerta (char * mensagem) {
+    printf("%s", mensagem);
+}
+
+void erro(char *mensagem) {
+    printf("%s", mensagem);
 }

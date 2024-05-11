@@ -1,8 +1,12 @@
 #ifndef KERNEL_H
 #define KERNEL_H
+
+#include <stdio.h>
+#include <stdlib.h>
 #include "process.h"
 #include "semaphore.h"
-// Funções do kernel
+
+// Funções do KERNEL
 char PROCESS_INTERRUPT = '1';
 char PROCESS_CREATE = '2';
 char PROCESS_FINISH = '3';
@@ -17,10 +21,10 @@ char SEMAPHORE_V = 'B'; // 11
 char PRINT_REQUEST = 'E'; // 14
 char PRINT_FINISH = 'F'; // 15
 
-typedef struct Kernel {
-    /* Process Table Information (aka PCB) */
-    pcb pcb;
-    int next_proc_id;
+typedef struct kernel {
+    /* processo Table Information (aka PCB) */
+    PCB pcb;
+    int proxId;
 
     /* Segment Table Information */
     //segment_table_t seg_table;
@@ -31,25 +35,25 @@ typedef struct Kernel {
     /* Disk Scheduler Information */
     //disk_scheduler_t disk_scheduler;
 
-    /* Semaphore Table Information */
-    semaphore_table_t sem_table;
+    /* Semaforo Table Information */
+    TABELA_SEMAFORO tabelaSemaforo;
 
     /* File Table Information */
     //file_table_t file_table;
 
     int pc; /* Program Counter */
-} kernel_t;
+} KERNEL;
 
-/* Kernel Variables */
+/* kernel Variables */
 
 /**
- * A pointer to the kernel structure. This
+ * A pointer to the KERNEL structure. This
  * variable must be initialized and will be
  * when the kernel_init function is called.
  */
-extern kernel_t* kernel;
+extern KERNEL* kernel;
 
-
+void iniciaKernel();
 void sysCall(char function, void* arg);
 
 

@@ -1,11 +1,17 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "log.h"
 #include "terminal.c"
 
-int main(){
+clock_t inicio;
+
+int main() {
+
+    inicio = clock();
+
     process_log_init();
     memory_log_init();
 
