@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "process.h"
+
+#include "kernel.h"
 #include "list.h"
+#include "process.h"
 
 pcb *BCP;
 
@@ -22,7 +24,7 @@ list_t* res_acq_log_list;
 
 
 void main_menu() {
-    char file_name[31];
+    char fileName[31];
     BCP = malloc(sizeof(pcb));
     BCP->head = NULL;
     BCP->tail = NULL;
@@ -36,13 +38,9 @@ void main_menu() {
     scanf("%d", &op);
 
     if (op == 1) {
-        scanf("%s", file_name);
+        scanf("%s", fileName);
         processInterrupt(BCP);
         sysCall(PROCESS_CREATE, fileName);
-
-
-        // interromper processo
-        // continuar execução
     } else if (op == 2) {
         // mostrar
     } else if (op == 3) {

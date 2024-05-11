@@ -4,6 +4,8 @@
 
 #include "log.h"
 
+#include "list.h"
+
 /* Process Log Related Function Definitions */
 
 /**

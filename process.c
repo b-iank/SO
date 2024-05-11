@@ -3,6 +3,8 @@
 #include <string.h>
 
 #include "process.h"
+
+#include "kernel.h"
 #include "memory.h"
 
 void processCreate(char* fileName) {
@@ -21,7 +23,7 @@ void processCreate(char* fileName) {
     memReq->code = code;
     mem_req_init(&memReq, process, code);
 
-    sysCall(MEM_LOAD_REQ, (void *) &memReq);
+    sysCall(MEMORY_LOAD_REQUEST, (void *) &memReq);
 }
 
 
@@ -60,13 +62,15 @@ void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code
 
     (*process) = malloc(sizeof(process_t));
 
-    fscanf(arquivo, "%s %d %d %d", (*process)->name, &(*process)->idSegmento, &(*process)->priority, &(*process)->tamanhoSegmento);
+    fscanf(arquivo, "%s %d %d %d", (*process)->name, &(*process)->idSegmento, &(*process)->priority,
+        &(*process)->tamanhoSegmento);
 
+    // TODO: adicionar na tabela de semáforos
     (*process)->numSemaforos = 0;
     while (1)
     {
         int semaforo;
-        if (fscanf(arquivo, "%d", &semaforo) != 1)
+        if (fscanf(arquivo, "%c", &semaforo) != 1)
             break;
         (*process)->semaforos[(*process)->numSemaforos++] = semaforo;
     }
@@ -87,7 +91,7 @@ void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code
 
     (*code) = (instruction *)malloc(sizeof(instruction) * (countCode));
 
-    if (!code) {
+    if (!(*code)) {
         printf("Sem memória!\n");
         exit(0);
     }
@@ -98,13 +102,16 @@ void readSyntacticProgram(FILE *arquivo, process_t **process, instruction **code
     i = 0;
     while (fgets(comando, 51, arquivo) != NULL)
     {
-        if (comando[0] == 'P' || comando[0] == 'V') // TODO: ler semáforo
+        if (comando[0] == 'P' || comando[0] == 'V') {
+            // TODO: ler semáforo
             printf("aaa");
-        else {
-            char* dupline = strdup(comando);
-            char* left_op = strtok(dupline, " ");
-            int right_op = atoi(strtok(NULL, " "));
+        }
+        else { // exec 1000
+            char* left_op = malloc(sizeof(char)*6);
+            int right_op;
 
+            sscanf(comando, "%s %d", left_op, &right_op);
+            // TODO: validar espaço
             if (strcmp(left_op, "exec") == 0)
                 (*code)[i].op = EXEC;
             else if (strcmp(left_op, "read") == 0)
@@ -141,15 +148,12 @@ process_t *processCreate(int id, const char *name)
 
 void processInterrupt(pcb *BCP)
 {
-    process_t *current = BCP->current;
     printf("Interrupcao do processo %d\n", BCP->current->id);
     // Realizar as ações necessárias para tratar a interrupção
     // troca de contexto etc
-    if (current->remainingTime <= 0) {
+    if (BCP->current->remainingTime <= 0) {
         processFinish(BCP);
-        return;
     }
-
 }
 
 void processFinish(pcb *BCP)

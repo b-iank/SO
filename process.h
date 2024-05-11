@@ -13,7 +13,7 @@ typedef struct Process{
     int idSegmento;
     int priority;
     int tamanhoSegmento;
-    int semaforos[MAX_SEMAFOROS];
+    char semaforos[MAX_SEMAFOROS];
     int numSemaforos;
     int numComandos;
     // Legado
@@ -31,7 +31,7 @@ typedef struct lista_circular_processos {
 
 pcb *add_process(pcb *lista, process_t *processo);
 void readSyntacticProgram(FILE *, process_t**, instruction**);
-process_t* processCreate(int id, const char *name);
+void processCreate(char *name);
 void processInterrupt(pcb *lista);
 void processFinish(pcb *lista);
 
