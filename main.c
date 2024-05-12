@@ -1,5 +1,5 @@
 #include <pthread.h>
-#include <semaphore.h>
+#include <semaforo.h>
 #include <stdio.h>
 #include <time.h>
 

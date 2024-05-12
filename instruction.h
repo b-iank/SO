@@ -1,7 +1,7 @@
 #ifndef INSTRUCTION_H
 #define INSTRUCTION_H
 
-#include "semaphore.h"
+#include "semaforo.h"
 
 char EXEC = '1';
 char READ = '2';

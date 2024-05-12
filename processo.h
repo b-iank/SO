@@ -1,8 +1,15 @@
 #ifndef PROCESS_H
 #define PROCESS_H
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+
 #include "instruction.h"
+#include "semaforo.h"
+#include "terminal.c"
+#include "kernel.h"
+#include "memoria.h"
 
 #define MAX_PROCESS_NAME 50
 #define QUANTUM_TIME 5000
@@ -14,7 +21,7 @@ char EXECUTANDO = '3';
 char CONCLUIDO = '4';
 
 
-typedef struct processo{
+typedef struct processo {
     // Cabecalho
     char nome[MAX_PROCESS_NAME];
     int idSegmento;
@@ -42,11 +49,15 @@ typedef struct pcb {
 } PCB;
 
 PCB iniciaPCB();
+
 PCB *add_process(PCB *lista, PROCESSO *processo);
 
-void readSyntheticProgram(FILE *, PROCESSO**, instruction**);
+void readSyntheticProgram(FILE *, PROCESSO **, instruction **);
+
 void processCreate(char *fileName);
+
 void processInterrupt(PCB *lista);
+
 void processFinish(PCB *lista);
 
 #endif //PROCESS_H

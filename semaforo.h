@@ -6,10 +6,10 @@
 #include <string.h>
 #include <semaphore.h>
 
-#include "process.h"
+#include "processo.h"
 #include "terminal.c"
 #include "kernel.h"
-#include "memory.h"
+#include "memoria.h"
 
 #define MAX_SEMAFOROS 10 //TODO: defiir quantos semaforos sao
 
@@ -26,8 +26,11 @@ typedef struct tabela_semaforo {
 } TABELA_SEMAFORO;
 
 TABELA_SEMAFORO inciaTabelaSemaforo();
+
 void novoSemaforo(char nome);
-SEMAFORO * buscaSemaforo(char semaforo);
+
+SEMAFORO *buscaSemaforo(char semaforo);
+
 int adicionaTabelaSemaforo(SEMAFORO *semaforo);
 
 #endif

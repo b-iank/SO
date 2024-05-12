@@ -1,5 +1,4 @@
-#include "semaphore.h"
-#include "kernel.h"
+#include "semaforo.h"
 
 TABELA_SEMAFORO inciaTabelaSemaforo() {
     TABELA_SEMAFORO tabelaSemaforo;
@@ -39,7 +38,7 @@ int adicionaTabelaSemaforo(SEMAFORO *semaforo) {
     return 1;
 }
 
-SEMAFORO * buscaSemaforo(char semaforo) {
+SEMAFORO *buscaSemaforo(char semaforo) {
     TABELA_SEMAFORO tabela = kernel->tabelaSemaforo;
     for (int i = 0; i < MAX_SEMAFOROS; i++) {
         if (tabela.semaforo[i].nome == semaforo)

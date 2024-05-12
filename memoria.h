@@ -1,7 +1,7 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#include "process.h"
+#include "processo.h"
 
 typedef struct memoria {
     PROCESSO* process;

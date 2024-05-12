@@ -1,12 +1,13 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.25)
 project(SO C)
 
+include_directories(.)
 set(CMAKE_C_STANDARD 11)
 
 add_executable(SO main.c
-        process.c
+        processo.c
         terminal.c
         log.c
         instruction.c
         kernel.c
-        semaphore.c)
+        semaforo.c)
