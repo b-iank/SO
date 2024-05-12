@@ -8,6 +8,7 @@ add_executable(SO main.c
         processo.c
         terminal.c
         log.c
-        instruction.c
+        instrucao.c
         kernel.c
-        semaforo.c)
+        semaforo.c
+        memoria.c)

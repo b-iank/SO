@@ -4,7 +4,7 @@
 void processCreate(char *fileName) {
     FILE *fp = fopen(fileName, "r");
     PROCESSO *process = NULL;
-    instruction *code = NULL;
+    instrucao *code = NULL;
 
     if (!(fp = fopen(fileName, "r"))) {
         exit(EXIT_FAILURE);
@@ -56,7 +56,7 @@ PCB *add_process(PCB *TCP, PROCESSO *processo) {
     return lista_aux;
 }
 
-void readSyntheticProgram(FILE *arquivo, PROCESSO **process, instruction **code) {
+void readSyntheticProgram(FILE *arquivo, PROCESSO **process, instrucao **code) {
     long int code_section;
     int countCode;
     long tamanhoArquivo;
@@ -112,7 +112,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, instruction **code)
 
     fseek(arquivo, code_section, SEEK_SET);
 
-    (*code) = (instruction *) malloc(sizeof(instruction) * (countCode));
+    (*code) = (instrucao *) malloc(sizeof(instrucao) * (countCode));
 
     if (!(*code)) {
         printf("Sem memória!\n");

@@ -1,5 +1,5 @@
-#ifndef SEMAPHORE_H
-#define SEMAPHORE_H
+#ifndef SEMAFORO_H
+#define SEMAFORO_H
 
 #include <stdio.h>
 #include <stdlib.h>
