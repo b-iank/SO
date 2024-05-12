@@ -10,10 +10,10 @@ sem_t res_acq_mutex;
 pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t refresh_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-list_t* process_log_list;
-list_t* disk_log_list;
-list_t* io_log_list;
-list_t* res_acq_log_list;
+list_t *process_log_list;
+list_t *disk_log_list;
+list_t *io_log_list;
+list_t *res_acq_log_list;
 
 
 void main_menu() {
@@ -35,14 +35,18 @@ void main_menu() {
     } else if (op == 3) {
         // mostrar
     } else {
-        printf("Operação não suportada\n");
+        erro("Operação não suportada");
     }
 }
 
-void alerta (char * mensagem) {
-    printf("%s", mensagem);
+void sucesso(char *mensagem) {
+    printf("%s\n", mensagem);
+}
+
+void alerta(char *mensagem) {
+    printf("%s\n", mensagem);
 }
 
 void erro(char *mensagem) {
-    printf("%s", mensagem);
+    printf("%s\n", mensagem);
 }

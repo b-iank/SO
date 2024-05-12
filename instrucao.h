@@ -19,4 +19,4 @@ typedef struct instrucao {
 
 void instr_parse(INSTRUCAO *instr, const char *line, TABELA_SEMAFORO *sem_table);
 
-#endif // SO_PROJECT_INSTRUCAO_H
+#endif // INSTRUCAO_H

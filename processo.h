@@ -7,7 +7,6 @@
 
 #include "instrucao.h"
 #include "semaforo.h"
-#include "terminal.c"
 #include "kernel.h"
 #include "memoria.h"
 
@@ -49,15 +48,10 @@ typedef struct pcb {
 } PCB;
 
 PCB iniciaPCB();
-
 PCB *add_process(PCB *lista, PROCESSO *processo);
-
-void readSyntheticProgram(FILE *, PROCESSO **, instrucao **);
-
+void readSyntheticProgram(FILE *, PROCESSO **, INSTRUCAO **);
 void processCreate(char *fileName);
-
 void processInterrupt(PCB *lista);
-
 void processFinish(PCB *lista);
 
 #endif //PROCESSO_H

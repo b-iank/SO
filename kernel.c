@@ -4,7 +4,7 @@ void iniciaKernel() {
     kernel = (KERNEL *)malloc(sizeof(KERNEL));
 
     if (!kernel) {
-        printf("Sem memória!\n");
+        alerta("Sem memoria");
         exit(0);
     }
 
