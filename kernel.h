@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "processo.h"
-#include "semaforo.h"
 
 // Funções do KERNEL
 const char PROCESS_INTERRUPT = '1';
@@ -27,19 +26,19 @@ typedef struct kernel {
     int proxId;
 
     /* Segment Table Information */
-    //segment_table_t seg_table;
+    // segment_table_t seg_table;
 
     /* Scheduler Information */
-    //scheduler_t scheduler;
+    // scheduler_t scheduler;
 
     /* Disk Scheduler Information */
-    //disk_scheduler_t disk_scheduler;
+    // disk_scheduler_t disk_scheduler;
 
     /* Semaforo Table Information */
     TABELA_SEMAFORO tabelaSemaforo;
 
     /* File Table Information */
-    //file_table_t file_table;
+    // file_table_t file_table;
 
     int pc; /* Program Counter */
 } KERNEL;
@@ -51,10 +50,10 @@ typedef struct kernel {
  * variable must be initialized and will be
  * when the kernel_init function is called.
  */
-extern KERNEL* kernel;
+extern KERNEL *kernel;
 
 void iniciaKernel();
-void sysCall(char function, void* arg);
+void sysCall(const char function, void *arg);
 
 
-#endif //KERNEL_H
+#endif // KERNEL_H

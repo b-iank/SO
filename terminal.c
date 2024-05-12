@@ -1,26 +1,21 @@
 #include "terminal.h"
 
-void main_menu() {
+int main_menu() {
     char fileName[31];
 
     int op;
-    printf("Menu\n");
-    printf("1 - Executar PROCESSO\n");
-    printf("2 - Ver processos\n");
-    printf("3 - Ver memória\n");
-    scanf("%d", &op);
+    do {
+        printf("Menu\n");
+        printf("1 - Executar processo\n");
+        printf("2 - Ver processos\n");
+        printf("3 - Ver memoria\n");
+        printf("0 - Sair\n");
+        scanf("%d", &op);
 
-    if (op == 1) {
-        scanf("%s", fileName);
-        processInterrupt(&kernel->pcb);
-        sysCall(PROCESS_CREATE, fileName);
-    } else if (op == 2) {
-        // mostrar
-    } else if (op == 3) {
-        // mostrar
-    } else {
+        if (op <= 3 && op >= 0)
+            return op;
         erro("Operação não suportada");
-    }
+    } while (op > 3 || op < 0);
 }
 
 void sucesso(char *mensagem) {

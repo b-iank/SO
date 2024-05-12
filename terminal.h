@@ -5,10 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "processo.h"
-#include "kernel.h"
-
-void main_menu();
+int main_menu();
 void alerta(char *mensagem);
 void erro(char *mensagem);
 

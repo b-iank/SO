@@ -5,10 +5,13 @@
 
 #include "log.h"
 #include "terminal.h"
+#include "kernel.h"
 
 clock_t inicio;
 
 int main() {
+    int op;
+    char fileName[255];
 
     inicio = clock();
 
@@ -19,7 +22,22 @@ int main() {
     disk_init();
     cpu_init();
 
-    main_menu();
-
+    do {
+        op = main_menu();
+        if (op == 1) {
+            scanf("%s", fileName);
+            processInterrupt(&kernel->pcb);
+            sysCall(PROCESS_CREATE, fileName);
+        }
+        else if (op == 2) {
+            // a
+        }
+        else if (op == 3) {
+            //
+        }
+        else {
+            printf("Adeus Aleardo :D");
+        }
+    } while (op != 0);
     return 0;
 }

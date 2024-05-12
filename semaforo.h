@@ -4,6 +4,7 @@
 #include <semaphore.h>
 
 #include "terminal.h"
+#include <processo.h>
 
 #define MAX_SEMAFOROS 10 //TODO: defiir quantos semaforos sao
 
