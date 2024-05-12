@@ -79,14 +79,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
         if (fscanf(arquivo, "%c", &semaforo) != 1)
             break;
 
-        int existe = 0;
-        for (int i = 0; i < (*process)->quantidadeSemaforos; i++) {
-            if ((*process)->semaforos[i] == semaforo) {
-                existe = 1;
-            }
-        }
-
-        if (existe) {
+        if (existeSemaforoProcesso(semaforo, *process)) {
             char *mensagem = malloc(21);
             sprintf(mensagem, "Semaforo %c ja existe", semaforo);
             alerta(mensagem);
@@ -125,14 +118,20 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
     int i = 0;
     while (fgets(comando, 51, arquivo) != NULL) {
         if (comando[0] == 'P' || comando[0] == 'V') {
-            // TODO: ler semáforo
-            printf("aaa");
+            if (!existeSemaforoProcesso(comando[2], *process)) {
+                char mensagem[255];
+                sprintf(mensagem, "O semaforo %c nao existe.", comando[2]);
+                erro(mensagem);
+                exit(0);
+            }
+            (*code)[i].op = comando[0] == 'P' ? SEM_P : SEM_V;
+            (*code)[i].sem = comando[2];
         } else { // exec 1000
             char *left_op = malloc(sizeof(char) * 6);
             int right_op;
 
             sscanf(comando, "%s %d", left_op, &right_op);
-            // TODO: validar espaço
+
             if (strcmp(left_op, "exec") == 0)
                 (*code)[i].op = EXEC;
             else if (strcmp(left_op, "read") == 0)
@@ -141,7 +140,10 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
                 (*code)[i].op = WRITE;
             else if (strcmp(left_op, "print") == 0)
                 (*code)[i].op = PRINT;
-
+            else {
+                erro("Operacao invalida");
+                exit(0);
+            }
             (*code)[i].value = right_op;
             (*code)[i].sem = NULL;
         }

@@ -1,15 +1,9 @@
 #ifndef SEMAFORO_H
 #define SEMAFORO_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <semaphore.h>
 
-#include "processo.h"
-#include "terminal.c"
-#include "kernel.h"
-#include "memoria.h"
+#include "terminal.h"
 
 #define MAX_SEMAFOROS 10 //TODO: defiir quantos semaforos sao
 
@@ -30,6 +24,8 @@ TABELA_SEMAFORO inciaTabelaSemaforo();
 void novoSemaforo(char nome);
 
 SEMAFORO *buscaSemaforo(char semaforo);
+
+int existeSemaforoProcesso(char semaforo, PROCESSO *process);
 
 int adicionaTabelaSemaforo(SEMAFORO *semaforo);
 

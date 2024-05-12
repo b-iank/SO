@@ -7,8 +7,6 @@
 
 #include "processo.h"
 #include "kernel.h"
-#include "memoria.h"
-#include "list.h"
 
 void main_menu();
 void alerta(char *mensagem);

@@ -47,3 +47,12 @@ SEMAFORO *buscaSemaforo(char semaforo) {
 
     return NULL;
 }
+
+int existeSemaforoProcesso(char semaforo, PROCESSO *process) {
+    for (int i = 0; i < process->quantidadeSemaforos; i++) {
+        if (process->semaforos[i] == semaforo) {
+            return 1;
+        }
+    }
+    return 0;
+}

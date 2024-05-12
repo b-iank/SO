@@ -2,13 +2,10 @@
 #define PROCESSO_H
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 #include "instrucao.h"
 #include "semaforo.h"
-#include "kernel.h"
-#include "memoria.h"
 
 #define MAX_PROCESS_NAME 50
 #define QUANTUM_TIME 5000

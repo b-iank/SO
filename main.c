@@ -4,7 +4,7 @@
 #include <time.h>
 
 #include "log.h"
-#include "terminal.c"
+#include "terminal.h"
 
 clock_t inicio;
 
