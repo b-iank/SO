@@ -1,13 +1,12 @@
 #include <pthread.h>
-#include "semaforo/semaforo.h"
 #include <stdio.h>
 #include <time.h>
 
-#include "ribabari/log.h"
-#include "terminal/terminal.h"
-#include "kernel/kernel.h"
+#include "so/so.h"
 
 clock_t inicio;
+
+KERNEL *kernel;
 
 int main() {
     int op;
@@ -15,12 +14,14 @@ int main() {
 
     inicio = clock();
 
-    process_log_init();
-    memory_log_init();
+    //process_log_init();
+    // memory_log_init();
 
-    kernel_init();
-    disk_init();
-    cpu_init();
+     kernel = iniciaKernel();
+
+
+    // disk_init();
+    // cpu_init();
 
     do {
         op = main_menu();
@@ -28,14 +29,11 @@ int main() {
             scanf("%s", fileName);
             processInterrupt(&kernel->pcb);
             sysCall(PROCESS_CREATE, fileName);
-        }
-        else if (op == 2) {
+        } else if (op == 2) {
             // a
-        }
-        else if (op == 3) {
+        } else if (op == 3) {
             //
-        }
-        else {
+        } else {
             printf("Adeus Aleardo :D");
         }
     } while (op != 0);
