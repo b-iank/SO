@@ -1,7 +1,7 @@
 #ifndef INSTRUCAO_H
 #define INSTRUCAO_H
 
-#include <semaforo.h>
+#include "semaforo/semaforo.h"
 
 const char EXEC = '1';
 const char READ = '2';

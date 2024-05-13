@@ -5,10 +5,10 @@ include_directories(.)
 set(CMAKE_C_STANDARD 11)
 
 add_executable(SO main.c
-        processo.c
-        terminal.c
-        log.c
-        instrucao.c
-        kernel.c
-        semaforo.c
-        memoria.c)
+        processo/processo.c
+        terminal/terminal.c
+        ribabari/log.c
+        instrucao/instrucao.c
+        kernel/kernel.c
+        semaforo/semaforo.c
+        memoria/memoria.c)

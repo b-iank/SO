@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <semaforo.h>
+#include "semaforo/semaforo.h"
 
 //1GB of memory
 #define MAX_MEM_SIZE 1074000000

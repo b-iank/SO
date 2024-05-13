@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "processo.h"
-#include "instrucao.h"
+#include "processo/processo.h"
+#include "instrucao/instrucao.h"
 
 typedef struct memoria {
     PROCESSO *process;

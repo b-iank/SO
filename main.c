@@ -1,11 +1,11 @@
 #include <pthread.h>
-#include <semaforo.h>
+#include "semaforo/semaforo.h"
 #include <stdio.h>
 #include <time.h>
 
-#include "log.h"
-#include "terminal.h"
-#include "kernel.h"
+#include "ribabari/log.h"
+#include "terminal/terminal.h"
+#include "kernel/kernel.h"
 
 clock_t inicio;
 

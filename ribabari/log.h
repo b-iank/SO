@@ -1,7 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <semaforo.h>
+#include "semaforo/semaforo.h"
 
 #include "list.h"
 

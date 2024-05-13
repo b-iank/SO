@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "processo.h"
+#include "processo/processo.h"
 
 // Funções do KERNEL
 const char PROCESS_INTERRUPT = '1';

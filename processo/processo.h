@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "instrucao.h"
+#include "instrucao/instrucao.h"
 
 #define MAX_PROCESS_NAME 50
 #define QUANTUM_TIME 5000
