@@ -22,7 +22,7 @@ void iniciaKernel() {
     // file_table_init(&kernel->file_table);
 }
 
-void sysCall(const char function, void* arg) {
+void sysCall(char function, void* arg) {
 
     switch (function) {
         case PROCESS_INTERRUPT: {

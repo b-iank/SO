@@ -1,5 +1,5 @@
-#ifndef SO_TERMINAL_H
-#define SO_TERMINAL_H
+#ifndef TERMINAL_H
+#define TERMINAL_H
 
 #include <stdio.h>
 #include <stdlib.h>

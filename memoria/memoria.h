@@ -5,13 +5,14 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "processo/processo.h"
-#include "instrucao/instrucao.h"
+#include "../processo/processo.h"
 
-typedef struct memoria {
+typedef struct memoria MEMORIA;
+
+struct memoria {
     PROCESSO *process;
     INSTRUCAO *code;
-} MEMORIA;
+};
 
 
 #endif //MEMORIA_H

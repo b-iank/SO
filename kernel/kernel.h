@@ -3,24 +3,26 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "processo/processo.h"
+#include "../processo/processo.h"
 
 // Funções do KERNEL
-const char PROCESS_INTERRUPT = '1';
-const char PROCESS_CREATE = '2';
-const char PROCESS_FINISH = '3';
-const char DISK_REQUEST = '4';
-const char DISK_FINISH = '5';
-const char MEMORY_LOAD_REQUEST = '6';
-const char MEMORY_LOAD_FINISH = '7';
-const char FILE_SYSTEM_REQUEST = '8';
-const char FILE_SYSTEM_FINISH = '9';
-const char SEMAPHORE_P = 'A'; // 10
-const char SEMAPHORE_V = 'B'; // 11
-const char PRINT_REQUEST = 'E'; // 14
-const char PRINT_FINISH = 'F'; // 15
+#define PROCESS_INTERRUPT '1'
+#define PROCESS_CREATE '2'
+#define PROCESS_FINISH '3'
+#define DISK_REQUEST '4'
+#define DISK_FINISH '5'
+#define MEMORY_LOAD_REQUEST '6'
+#define MEMORY_LOAD_FINISH '7'
+#define FILE_SYSTEM_REQUEST '8'
+#define FILE_SYSTEM_FINISH '9'
+#define SEMAPHORE_P 'A' // 10
+#define SEMAPHORE_V 'B' // 11
+#define PRINT_REQUEST 'E' // 14
+#define PRINT_FINISH 'F' // 15
 
-typedef struct kernel {
+typedef struct kernel KERNEL;
+
+struct kernel {
     /* processo Table Information (aka PCB) */
     PCB pcb;
     int proxId;
@@ -41,7 +43,7 @@ typedef struct kernel {
     // file_table_t file_table;
 
     int pc; /* Program Counter */
-} KERNEL;
+};
 
 /* kernel Variables */
 
@@ -53,7 +55,7 @@ typedef struct kernel {
 extern KERNEL *kernel;
 
 void iniciaKernel();
-void sysCall(const char function, void *arg);
+void sysCall(char function, void *arg);
 
 
 #endif // KERNEL_H
