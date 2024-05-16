@@ -1,5 +1,6 @@
 #include "../so/so.h"
 
+int ID_SEGMENTOS = 0;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 TABELA_SEMAFORO inciaTabelaSemaforo() {
@@ -73,12 +74,9 @@ void processCreate(char *fileName) {
 
     readSyntheticProgram(fp, &process, &code);
 
-//    memoryRequest *memReq = malloc(sizeof(memoryRequest));
-//    memReq->process = process;
-//    memReq->code = code;
-//    mem_req_init(&memReq, process, code);
+    MEMORIA *memReq = memoriaRequest(process, code);
 
-    //sysCall(MEMORY_LOAD_REQUEST, (void *) &memReq);
+    sysCall(MEMORY_LOAD_REQUEST, (void *) &memReq);
 }
 
 PCB iniciaPCB() {
@@ -230,13 +228,49 @@ void processFinish(PCB *BCP) {
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES INSTRUÇÃO -------------------------------------
-void instr_parse(INSTRUCAO *instr, const char *line, TABELA_SEMAFORO *sem_table) {
-    //TODO: implementar
-}
+
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
+MEMORIA * memoriaRequest(PROCESSO * processo, INSTRUCAO * codigo) {
+    MEMORIA *memoria = malloc(sizeof(MEMORIA));
+    if (!memoria) {
+        erro("Sem memoria.");
+        exit(EXIT_FAILURE);
+    }
+    memoria->process = processo;
+    memoria->code = codigo;
+    return memoria;
+}
 
+void memoriaLoadRequest(MEMORIA *memReq) {
+    TABELA_SEGMENTO tabelaSegmentos = kernel->seg_table;
+    SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
+    int i = tabelaSegmentos.quantSegmentos;
+    tabelaSegmentos.quantSegmentos++;
+
+    segmento->id = ID_SEGMENTOS++;
+    segmento->pageQuant = (int) (memReq->process->tamanhoSegmento)/(TAMANHO_PAGINA); // TODO: truncate
+
+    const int restante = tabelaSegmentos.memoriaRestante - memReq->process->tamanhoSegmento;
+
+    tabelaSegmentos.memoriaRestante = restante;
+
+    if (restante < 0) {
+        tabelaSegmentos.memoriaRestante += trocarPaginas(segmento);
+    }
+
+    adicionaTabelaSegmentos(segmento);
+}
+
+int trocarPaginas(SEGMENTO segmento) {
+
+    return 0;
+}
+
+void adicionaTabelaSegmentos(SEGMENTO *segmento) {
+    return;
+}
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
@@ -244,7 +278,7 @@ KERNEL *iniciaKernel() {
     kernel = (KERNEL *) malloc(sizeof(KERNEL));
 
     if (!kernel) {
-        alerta("Sem memoria");
+        erro("Sem memoria");
         exit(EXIT_FAILURE);
     }
 
@@ -279,6 +313,8 @@ void sysCall(char function, void *arg) {
             break;
         }
         case MEMORY_LOAD_REQUEST: {
+            memoriaLoadRequest((MEMORIA *)arg);
+            //interruptControl(MEM_LOAD_FINISH, (MEMORIA *)arg);
             break;
         }
         case MEMORY_LOAD_FINISH: {
@@ -290,21 +326,21 @@ void sysCall(char function, void *arg) {
         case SEMAPHORE_V: {
             break;
         }
-        case DISK_REQUEST: {
-            break;
-        }
-        case DISK_FINISH: {
-            break;
-        }
-        case PRINT_REQUEST: {
-            break;
-        }
-        case FILE_SYSTEM_REQUEST: {
-            break;
-        }
-        case FILE_SYSTEM_FINISH: {
-            break;
-        }
+        // case DISK_REQUEST: {
+        //     break;
+        // }
+        // case DISK_FINISH: {
+        //     break;
+        // }
+        // case PRINT_REQUEST: {
+        //     break;
+        // }
+        // case FILE_SYSTEM_REQUEST: {
+        //     break;
+        // }
+        // case FILE_SYSTEM_FINISH: {
+        //     break;
+        // }
         default: { //delete(System32);
             break;
         }
