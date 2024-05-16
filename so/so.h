@@ -133,14 +133,8 @@ struct kernel {
     /* Scheduler Information */
     // scheduler_t scheduler;
 
-    /* Disk Scheduler Information */
-    // disk_scheduler_t disk_scheduler;
-
     /* Semaforo Table Information */
     TABELA_SEMAFORO tabelaSemaforo; // <- Guarda a tabela de semáforo
-
-    /* File Table Information */
-    // file_table_t file_table;
 
     int pc; // <- Program Counter
 };
@@ -148,7 +142,7 @@ struct kernel {
 extern KERNEL *kernel;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
-TABELA_SEMAFORO inciaTabelaSemaforo();
+TABELA_SEMAFORO iniciaTabelaSemaforo();
 void novoSemaforo(char nome);
 SEMAFORO *buscaSemaforo(char semaforo);
 int existeSemaforoProcesso(char semaforo, PROCESSO *process);
@@ -168,6 +162,7 @@ void processFinish(PCB *lista);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
+TABELA_SEGMENTO iniciaTabelaSegmentos();
 MEMORIA * memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
 void memoriaLoadRequest(MEMORIA *memReq);
 int trocarPaginas(SEGMENTO *segmento);

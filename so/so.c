@@ -1,9 +1,11 @@
 #include "../so/so.h"
 
+#include <math.h>
+
 int ID_SEGMENTOS = 0;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
-TABELA_SEMAFORO inciaTabelaSemaforo() {
+TABELA_SEMAFORO iniciaTabelaSemaforo() {
     TABELA_SEMAFORO tabelaSemaforo;
     tabelaSemaforo.quantidadeSemaforos = 0;
 
@@ -232,6 +234,15 @@ void processFinish(PCB *BCP) {
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
+TABELA_SEGMENTO iniciaTabelaSegmentos() {
+    TABELA_SEGMENTO tabelaSegmento;
+    tabelaSegmento.segmentos = NULL;
+    tabelaSegmento.quantSegmentos = 0;
+    tabelaSegmento.memoriaRestante = 1073741824; // (1024^3);
+
+    return tabelaSegmento;
+}
+
 MEMORIA * memoriaRequest(PROCESSO * processo, INSTRUCAO * codigo) {
     MEMORIA *memoria = malloc(sizeof(MEMORIA));
     if (!memoria) {
@@ -244,33 +255,41 @@ MEMORIA * memoriaRequest(PROCESSO * processo, INSTRUCAO * codigo) {
 }
 
 void memoriaLoadRequest(MEMORIA *memReq) {
-    TABELA_SEGMENTO tabelaSegmentos = kernel->seg_table;
+    TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
     SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
-    int i = tabelaSegmentos.quantSegmentos;
-    tabelaSegmentos.quantSegmentos++;
 
-    segmento->id = ID_SEGMENTOS++;
-    segmento->pageQuant = (int) (memReq->process->tamanhoSegmento)/(TAMANHO_PAGINA); // TODO: truncate
+    segmento->id = ++ID_SEGMENTOS;
+    segmento->pageQuant = (int) ceil((double) (memReq->process->tamanhoSegmento)/(TAMANHO_PAGINA));
 
-    const int restante = tabelaSegmentos.memoriaRestante - memReq->process->tamanhoSegmento;
+    const int restante = tabelaSegmentos->memoriaRestante - memReq->process->tamanhoSegmento;
 
-    tabelaSegmentos.memoriaRestante = restante;
+    tabelaSegmentos->memoriaRestante = restante;
 
-    if (restante < 0) {
-        tabelaSegmentos.memoriaRestante += trocarPaginas(segmento);
-    }
+    if (restante < 0)
+        tabelaSegmentos->memoriaRestante += trocarPaginas(segmento);
 
+    memReq->process->idSegmento = segmento->id;
     adicionaTabelaSegmentos(segmento);
 }
 
-int trocarPaginas(SEGMENTO segmento) {
-
+int trocarPaginas(SEGMENTO *segmento) {
     return 0;
 }
 
 void adicionaTabelaSegmentos(SEGMENTO *segmento) {
-    return;
+    TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
+    int i = ++tabelaSegmentos->quantSegmentos;
+
+    tabelaSegmentos->segmentos = (SEGMENTO*) realloc(tabelaSegmentos->segmentos, sizeof(SEGMENTO) * i);
+
+    if (!tabelaSegmentos->segmentos) {
+        erro("Sem memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    tabelaSegmentos->segmentos[i - 1] = *segmento;
 }
+
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
@@ -286,13 +305,13 @@ KERNEL *iniciaKernel() {
     kernel->proxId = 1; /* 0 is for the kernel */
     kernel->pc = 0; // TODO ?
 
-    // segment_table_init(&kernel->seg_table); // TODO
+    kernel->seg_table = iniciaTabelaSegmentos();
 
     // scheduler_init(&kernel->scheduler); // TODO
 
     // disk_scheduler_init(&kernel->disk_scheduler);
 
-    kernel->tabelaSemaforo = inciaTabelaSemaforo();
+    kernel->tabelaSemaforo = iniciaTabelaSemaforo();
 
     // file_table_init(&kernel->file_table);
 
@@ -300,7 +319,6 @@ KERNEL *iniciaKernel() {
 }
 
 void sysCall(char function, void *arg) {
-
     switch (function) {
         case PROCESS_INTERRUPT: {
             break;
