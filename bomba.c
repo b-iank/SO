@@ -63,7 +63,6 @@ typedef struct proc
 	pageTable_t* pTable;
 	command_t** code; //list of commands that comprise the code of the program
 	int nCommands; //number of commands the program has
-	
 } Process;
 
 typedef struct bcp_item

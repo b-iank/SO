@@ -9,10 +9,14 @@
 
 #include "../terminal/terminal.h"
 
-#define MAX_SEMAFOROS 10 //TODO: defiir quantos semaforos sao
+#define MAX_SEMAFOROS 10
 
 #define MAX_PROCESS_NAME 50
 #define QUANTUM_TIME 5000
+
+#define K 1024
+#define TAMANHO_PAGINA 8 * K
+#define TAMANHO_MAX_MEMORIA K * K * K // 1 GB = 1 * 1024 * 1024 * 1024
 
 // FUNÇÕES DO KERNEL
 #define PROCESS_INTERRUPT '1'
@@ -53,6 +57,8 @@ typedef struct pcb PCB;
 typedef struct instrucao INSTRUCAO;
 
 typedef struct memoria MEMORIA;
+typedef struct segmento SEGMENTO;
+typedef struct tabela_segmento TABELA_SEGMENTO;
 
 typedef struct kernel KERNEL;
 
@@ -106,13 +112,23 @@ struct memoria {
     INSTRUCAO *code;
 };
 
+struct segmento {
+    int id;
+    int pageQuant;
+};
+
+struct tabela_segmento {
+    SEGMENTO* segmentos;
+    int quantSegmentos;
+    int memoriaRestante;
+};
 
 struct kernel {
     PCB pcb; // <- Bloco de controle de processos
     int proxId; // <- Guarda o próximo id de processo
 
     /* Segment Table Information */
-    // segment_table_t seg_table;
+    TABELA_SEGMENTO seg_table;
 
     /* Scheduler Information */
     // scheduler_t scheduler;
@@ -149,11 +165,13 @@ void processFinish(PCB *lista);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES INSTRUÇÃO -------------------------------------
-void instr_parse(INSTRUCAO *instr, const char *line, TABELA_SEMAFORO *sem_table);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
-
+MEMORIA * memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
+void memoriaLoadRequest(MEMORIA *memReq);
+int trocarPaginas(SEGMENTO *segmento);
+void adicionaTabelaSegmentos(SEGMENTO *segmento);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
