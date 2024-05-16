@@ -4,15 +4,9 @@ project(SO C)
 set(CMAKE_C_STANDARD 11)
 
 include_directories(.)
-include_directories(kernel memoria processo ribabari semaforo terminal)
+include_directories(terminal so)
 
-add_executable(SO main.c
-        processo/processo.c
-        terminal/terminal.c
-        ribabari/log.c
-        kernel/kernel.c
-        semaforo/semaforo.c
-        memoria/memoria.c)
+add_executable(SO main.c so/so.c terminal/terminal.c)
 
 
 set(WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
