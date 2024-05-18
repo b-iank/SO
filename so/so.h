@@ -121,26 +121,29 @@ struct memoria {
 
 struct segmento {
     int id;
-    int pageQuant;
+    int paginaQuant;
+    int paginaQuantMemoria;
+    int segundaChance; // 0 -> 1; 1 sai da memoria
 };
 
 struct tabela_segmento {
     SEGMENTO* segmentos;
     int quantSegmentos;
     int memoriaRestante;
+    int atual;
 };
 
 struct kernel {
     PCB pcb; // <- Bloco de controle de processos
     int proxId; // <- Guarda o próximo id de processo
 
-    /* Segment Table Information */
+    /* Tabela de Segmentos */
     TABELA_SEGMENTO seg_table;
 
     /* Scheduler Information */
     // scheduler_t scheduler;
 
-    /* Semaforo Table Information */
+    /* Tabela de Semaforos */
     TABELA_SEMAFORO tabelaSemaforo; // <- Guarda a tabela de semáforo
 
     int pc; // <- Program Counter
@@ -175,16 +178,21 @@ PROCESSO *buscaProcessoID(PCB pcb, int id);
 TABELA_SEGMENTO iniciaTabelaSegmentos();
 MEMORIA * memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
 void memoriaLoadRequest(MEMORIA *memReq);
-int trocarPaginas(SEGMENTO *segmento);
+int trocarPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
 KERNEL *iniciaKernel();
 void sysCall(char function, void *arg);
+void interruptControl(char function, void *arg);
 // ---------------------------------------------------------------------------------------------
 
-
+// ----------------------------------- FUNÇÕES ROUND-ROBIN --------------------------------------
+void iniciaRR();
+void adicionaProcesso();
+void desbloqueiaProcesso();
+// ---------------------------------------------------------------------------------------------
 
 
 #endif //SO_H

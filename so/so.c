@@ -304,21 +304,38 @@ void memoriaLoadRequest(MEMORIA *memReq) {
     SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
 
     segmento->id = ++ID_SEGMENTOS;
-    segmento->pageQuant = (int) ceil((double) (memReq->process->tamanhoSegmento) / (TAMANHO_PAGINA));
+
+    segmento->paginaQuant = (int) ceil((double) (memReq->process->tamanhoSegmento) / (TAMANHO_PAGINA));
+    memReq->process->idSegmento = segmento->id;
 
     const int restante = tabelaSegmentos->memoriaRestante - memReq->process->tamanhoSegmento;
 
     tabelaSegmentos->memoriaRestante = restante;
 
     if (restante < 0)
-        tabelaSegmentos->memoriaRestante += trocarPaginas(segmento);
-
-    memReq->process->idSegmento = segmento->id;
-    adicionaTabelaSegmentos(segmento);
+        trocarPaginas(segmento, restante);
+    else {
+        adicionaTabelaSegmentos(segmento);
+    }
 }
 
-int trocarPaginas(SEGMENTO *segmento) {
-    return 0;
+void trocaPaginas(SEGMENTO *novoSegmento, int requisicao) {
+    requisicao = requisicao * -1;
+    TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
+    while (tabelaSegmentos->memoriaRestante < 0) {
+        SEGMENTO segmentoAtual = tabelaSegmentos->segmentos[tabelaSegmentos->atual];
+        if (segmentoAtual.segundaChance && segmentoAtual.paginaQuantMemoria > 0) {
+            segmentoAtual.segundaChance = 0;
+        } else {
+            while (tabelaSegmentos->memoriaRestante < requisicao && segmentoAtual.paginaQuantMemoria > 0) {
+                segmentoAtual.paginaQuantMemoria--;
+                tabelaSegmentos->memoriaRestante += 8 * K;
+            }
+            segmentoAtual.segundaChance = 1;
+        }
+        tabelaSegmentos->atual = (tabelaSegmentos->atual + 1) % tabelaSegmentos->quantSegmentos;
+    }
+    adicionaTabelaSegmentos(novoSegmento);
 }
 
 void adicionaTabelaSegmentos(SEGMENTO *segmento) {
@@ -376,11 +393,8 @@ void sysCall(char function, void *arg) {
             break;
         }
         case MEMORY_LOAD_REQUEST: {
-            memoriaLoadRequest((MEMORIA *) arg);
-            //interruptControl(MEM_LOAD_FINISH, (MEMORIA *)arg);
-            break;
-        }
-        case MEMORY_LOAD_FINISH: {
+            memoriaLoadRequest((MEMORIA *)arg);
+            interruptControl(MEMORY_LOAD_FINISH, (MEMORIA *)arg);
             break;
         }
         case SEMAPHORE_P: {
@@ -419,5 +433,23 @@ static void sleep() {
 static void wakeup(PROCESSO *processo) {
     //desbloqueiaProcesso(&kernel->scheduler, processo); // TODO: implementar
 }
+void interruptControl(char function, void *arg) {
+    switch (function) {
+        case MEMORY_LOAD_FINISH: {
+            MEMORIA *memoria = (MEMORIA*) arg;
+            PROCESSO *processo = memoria->process;
+
+            add_process(&kernel->pcb, processo);
+            processo->estado = PRONTO;
+            break;
+        }
+        default: {
+            char mensagem[255];
+            sprintf(mensagem, "O processo %c nao esta definido.", function);
+            alerta(mensagem);
+        }
+    }
+}
 // ---------------------------------------------------------------------------------------------
+
 
