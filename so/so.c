@@ -313,7 +313,7 @@ void memoriaLoadRequest(MEMORIA *memReq) {
     tabelaSegmentos->memoriaRestante = restante;
 
     if (restante < 0)
-        trocarPaginas(segmento, restante);
+        trocaPaginas(segmento, restante);
     else {
         adicionaTabelaSegmentos(segmento);
     }

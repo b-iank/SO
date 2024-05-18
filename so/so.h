@@ -178,7 +178,7 @@ PROCESSO *buscaProcessoID(PCB pcb, int id);
 TABELA_SEGMENTO iniciaTabelaSegmentos();
 MEMORIA * memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
 void memoriaLoadRequest(MEMORIA *memReq);
-int trocarPaginas(SEGMENTO *segmento, int requisicao);
+void trocaPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
 // ---------------------------------------------------------------------------------------------
 
