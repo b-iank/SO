@@ -48,6 +48,12 @@
 #define SEM_P '5'
 #define SEM_V '6'
 
+// SCHEDULER
+#define NONE = 0x0
+#define IO_REQUESTED = 0x1
+#define QUANTUM_COMPLETED = 0x2
+#define SEMAPHORE_BLOCKED = 0x4
+
 typedef struct semaforo SEMAFORO;
 typedef struct tabela_semaforo TABELA_SEMAFORO;
 
@@ -65,7 +71,8 @@ typedef struct kernel KERNEL;
 struct semaforo {
     char nome;
     int S;
-    PROCESSO *aguardando;
+    int *idAguardando;
+    int aguardando;
     sem_t mutex;
 };
 
@@ -147,6 +154,8 @@ void novoSemaforo(char nome);
 SEMAFORO *buscaSemaforo(char semaforo);
 int existeSemaforoProcesso(char semaforo, PROCESSO *process);
 int adicionaTabelaSemaforo(SEMAFORO *semaforo);
+void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void));
+void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *));
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES PROCESSO --------------------------------------
@@ -156,6 +165,7 @@ void readSyntheticProgram(FILE *, PROCESSO **, INSTRUCAO **);
 void processCreate(char *fileName);
 void processInterrupt(PCB *lista);
 void processFinish(PCB *lista);
+PROCESSO *buscaProcessoID(PCB pcb, int id);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES INSTRUÇÃO -------------------------------------

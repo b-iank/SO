@@ -4,6 +4,10 @@
 
 int ID_SEGMENTOS = 0;
 
+static void sleep();
+
+static void wakeup(PROCESSO *proc);
+
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 TABELA_SEMAFORO iniciaTabelaSemaforo() {
     TABELA_SEMAFORO tabelaSemaforo;
@@ -24,7 +28,7 @@ void novoSemaforo(char nome) {
 
     semaforo->nome = nome;
     semaforo->S = 1; //TODO ?
-    semaforo->aguardando = NULL;
+    semaforo->aguardando = 0;
     sem_init(&semaforo->mutex, 0, 1);
 
     if (!adicionaTabelaSemaforo(semaforo)) {
@@ -61,6 +65,35 @@ int existeSemaforoProcesso(char semaforo, PROCESSO *process) {
         }
     }
     return 0;
+}
+
+void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void)) {
+    sem_wait(&semaforo->mutex);
+    semaforo->S--;
+    if (semaforo->S < 0) {
+        semaforo->idAguardando = realloc(semaforo->idAguardando, ++semaforo->aguardando * sizeof(int));
+        if (!semaforo->idAguardando) {
+            erro("Sem memoria");
+            exit(EXIT_FAILURE);
+        }
+        semaforo->idAguardando[semaforo->aguardando - 1] = processo->id;
+        sleep();
+    }
+    sem_post(&semaforo->mutex);
+}
+
+void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *)) {
+    sem_wait(&semaforo->mutex);
+    semaforo->S++;
+    if (semaforo->S <= 0 && semaforo->aguardando > 0) {
+        semaforo->aguardando--;
+        int id = semaforo->idAguardando[0], aux;
+        for (int i = 0; i < semaforo->aguardando; i++)
+            semaforo->idAguardando[i] = semaforo->idAguardando[i + 1];
+        PROCESSO *aguardando = buscaProcessoID(kernel->pcb, id);
+        wakeup(aguardando);
+    }
+    sem_post(&semaforo->mutex);
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -227,6 +260,18 @@ void processInterrupt(PCB *BCP) {
 void processFinish(PCB *BCP) {
     printf("Finalizando o PROCESSO %d\n", BCP->atual->id);
 }
+
+PROCESSO *buscaProcessoID(PCB pcb, int id) {
+    PROCESSO *busca = pcb.head;
+    while (busca) {
+        if (busca->id == id)
+            return busca;
+    }
+    char mensagem[255];
+    sprintf(mensagem, "Processo %d nao encontrado", id);
+    erro(mensagem);
+    exit(EXIT_FAILURE);
+}
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES INSTRUÇÃO -------------------------------------
@@ -243,7 +288,7 @@ TABELA_SEGMENTO iniciaTabelaSegmentos() {
     return tabelaSegmento;
 }
 
-MEMORIA * memoriaRequest(PROCESSO * processo, INSTRUCAO * codigo) {
+MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo) {
     MEMORIA *memoria = malloc(sizeof(MEMORIA));
     if (!memoria) {
         erro("Sem memoria.");
@@ -259,7 +304,7 @@ void memoriaLoadRequest(MEMORIA *memReq) {
     SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
 
     segmento->id = ++ID_SEGMENTOS;
-    segmento->pageQuant = (int) ceil((double) (memReq->process->tamanhoSegmento)/(TAMANHO_PAGINA));
+    segmento->pageQuant = (int) ceil((double) (memReq->process->tamanhoSegmento) / (TAMANHO_PAGINA));
 
     const int restante = tabelaSegmentos->memoriaRestante - memReq->process->tamanhoSegmento;
 
@@ -280,7 +325,7 @@ void adicionaTabelaSegmentos(SEGMENTO *segmento) {
     TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
     int i = ++tabelaSegmentos->quantSegmentos;
 
-    tabelaSegmentos->segmentos = (SEGMENTO*) realloc(tabelaSegmentos->segmentos, sizeof(SEGMENTO) * i);
+    tabelaSegmentos->segmentos = (SEGMENTO *) realloc(tabelaSegmentos->segmentos, sizeof(SEGMENTO) * i);
 
     if (!tabelaSegmentos->segmentos) {
         erro("Sem memoria");
@@ -331,7 +376,7 @@ void sysCall(char function, void *arg) {
             break;
         }
         case MEMORY_LOAD_REQUEST: {
-            memoriaLoadRequest((MEMORIA *)arg);
+            memoriaLoadRequest((MEMORIA *) arg);
             //interruptControl(MEM_LOAD_FINISH, (MEMORIA *)arg);
             break;
         }
@@ -339,30 +384,40 @@ void sysCall(char function, void *arg) {
             break;
         }
         case SEMAPHORE_P: {
+            P((SEMAFORO *) arg, kernel->pcb.atual, sleep);
             break;
         }
         case SEMAPHORE_V: {
+            V((SEMAFORO *) arg, wakeup);
             break;
         }
-        // case DISK_REQUEST: {
-        //     break;
-        // }
-        // case DISK_FINISH: {
-        //     break;
-        // }
-        // case PRINT_REQUEST: {
-        //     break;
-        // }
-        // case FILE_SYSTEM_REQUEST: {
-        //     break;
-        // }
-        // case FILE_SYSTEM_FINISH: {
-        //     break;
-        // }
+            // case DISK_REQUEST: {
+            //     break;
+            // }
+            // case DISK_FINISH: {
+            //     break;
+            // }
+            // case PRINT_REQUEST: {
+            //     break;
+            // }
+            // case FILE_SYSTEM_REQUEST: {
+            //     break;
+            // }
+            // case FILE_SYSTEM_FINISH: {
+            //     break;
+            // }
         default: { //delete(System32);
             break;
         }
     }
+}
+
+static void sleep() {
+    sysCall(PROCESS_INTERRUPT, (void *) 0x4);
+}
+
+static void wakeup(PROCESSO *processo) {
+    //desbloqueiaProcesso(&kernel->scheduler, processo); // TODO: implementar
 }
 // ---------------------------------------------------------------------------------------------
 
