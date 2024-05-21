@@ -27,7 +27,7 @@ void novoSemaforo(char nome) {
     }
 
     semaforo->nome = nome;
-    semaforo->S = 1; //TODO ?
+    semaforo->S = 1; // TODO ?
     semaforo->aguardando = 0;
     sem_init(&semaforo->mutex, 0, 1);
 
@@ -109,9 +109,9 @@ void processCreate(char *fileName) {
 
     readSyntheticProgram(fp, &process, &code);
 
-    MEMORIA *memReq = memoriaRequest(process, code);
+    process->codigo = code;
 
-    sysCall(MEMORY_LOAD_REQUEST, (void *) &memReq);
+    sysCall(MEMORY_LOAD_REQUEST, (void *) &process);
 }
 
 PCB iniciaPCB() {
@@ -164,7 +164,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
     (*process)->id = kernel->proxId++; // Pega o próximo id de processo e soma a variável
     (*process)->pc = 0;
     (*process)->estado = NOVO;
-    (*process)->tempoRestante = (QUANTUM_TIME / (*process)->prioridade);
+    (*process)->tempo = (QUANTUM_TIME / (*process)->prioridade);
     (*process)->tempoChegada = clock();
 
     (*process)->quantidadeSemaforos = 0;
@@ -250,16 +250,13 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
 
 void processInterrupt(PCB *BCP) {
     printf("Interrupcao do PROCESSO %d\n", BCP->atual->id);
-    // Realizar as ações necessárias para tratar a interrupção
-    // troca de contexto etc
-    if (BCP->atual->tempoRestante <= 0) {
+
+    if (BCP->atual->tempo <= 0) {
         processFinish(BCP);
     }
 }
 
-void processFinish(PCB *BCP) {
-    printf("Finalizando o PROCESSO %d\n", BCP->atual->id);
-}
+void processFinish(PCB *BCP) { printf("Finalizando o PROCESSO %d\n", BCP->atual->id); }
 
 PROCESSO *buscaProcessoID(PCB pcb, int id) {
     PROCESSO *busca = pcb.head;
@@ -299,16 +296,16 @@ MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo) {
     return memoria;
 }
 
-void memoriaLoadRequest(MEMORIA *memReq) {
+void memoriaLoadRequest(PROCESSO *processo) {
     TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
     SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
 
     segmento->id = ++ID_SEGMENTOS;
 
-    segmento->paginaQuant = (int) ceil((double) (memReq->process->tamanhoSegmento) / (TAMANHO_PAGINA));
-    memReq->process->idSegmento = segmento->id;
+    segmento->paginaQuant = (int) ceil((double) (processo->tamanhoSegmento) / (TAMANHO_PAGINA));
+    processo->idSegmento = segmento->id;
 
-    const int restante = tabelaSegmentos->memoriaRestante - memReq->process->tamanhoSegmento;
+    const int restante = tabelaSegmentos->memoriaRestante - processo->tamanhoSegmento;
 
     tabelaSegmentos->memoriaRestante = restante;
 
@@ -389,12 +386,9 @@ void sysCall(char function, void *arg) {
             processCreate((char *) arg);
             break;
         }
-        case PROCESS_FINISH: {
-            break;
-        }
         case MEMORY_LOAD_REQUEST: {
-            memoriaLoadRequest((MEMORIA *)arg);
-            interruptControl(MEMORY_LOAD_FINISH, (MEMORIA *)arg);
+            memoriaLoadRequest((PROCESSO *) arg);
+            interruptControl(MEMORY_LOAD_FINISH, (PROCESSO *) arg);
             break;
         }
         case SEMAPHORE_P: {
@@ -420,24 +414,22 @@ void sysCall(char function, void *arg) {
             // case FILE_SYSTEM_FINISH: {
             //     break;
             // }
-        default: { //delete(System32);
+        default: { // delete(System32);
             break;
         }
     }
 }
 
-static void sleep() {
-    sysCall(PROCESS_INTERRUPT, (void *) 0x4);
-}
+static void sleep() { sysCall(PROCESS_INTERRUPT, (void *) 0x4); }
 
 static void wakeup(PROCESSO *processo) {
-    //desbloqueiaProcesso(&kernel->scheduler, processo); // TODO: implementar
+    // desbloqueiaProcesso(&kernel->scheduler, processo); // TODO: implementar
 }
+
 void interruptControl(char function, void *arg) {
     switch (function) {
         case MEMORY_LOAD_FINISH: {
-            MEMORIA *memoria = (MEMORIA*) arg;
-            PROCESSO *processo = memoria->process;
+            PROCESSO *processo = (PROCESSO *) arg;
 
             add_process(&kernel->pcb, processo);
             processo->estado = PRONTO;
@@ -452,4 +444,92 @@ void interruptControl(char function, void *arg) {
 }
 // ---------------------------------------------------------------------------------------------
 
+// ------------------------------------- FUNÇÕES CPU -------------------------------------------
+void iniciaRR() {
+    return;
+}
 
+void adicionaProcesso() {
+    return;
+}
+
+void desbloqueiaProcesso() {
+    return;
+}
+
+void cpu_init() {
+    pthread_t cpu_id;
+    pthread_attr_t cpu_attr;
+
+    pthread_attr_init(&cpu_attr);
+    pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_create(&cpu_id, NULL, (void*)cpu, NULL);
+}
+
+_Noreturn void cpu() {
+    while (!kernel)
+        ;
+
+    struct timespec start;
+    struct timespec end;
+
+    clock_gettime(CLOCK_REALTIME, &start);
+
+    int no_process = 0;
+    while (1) {
+        if (!kernel->scheduler.scheduled_proc) {
+            if (!no_process) {
+                sem_post(&log_mutex);
+                sem_post(&refresh_sem);
+                no_process = 1;
+            }
+
+            schedule_process(&kernel->scheduler, NONE);
+        }
+        else {
+            no_process = 0;
+            do {
+                clock_gettime(CLOCK_REALTIME, &end);
+                const int elapsed = (end.tv_sec - start.tv_sec) * ONE_SECOND_NS
+                                    + (end.tv_nsec - start.tv_nsec);
+
+                if (elapsed >= ONE_SECOND_NS) {
+                    start = end;
+
+                    const int pc
+                        = FETCH_INSTR_ADDR(kernel->scheduler.scheduled_proc);
+                    const int page_number = PAGE_NUMBER(pc);
+                    const int page_offset = PAGE_OFFSET(pc);
+
+                    /* It set the used bit if it is not set */
+                    if (!page->used)
+                        page->used = 1;
+
+                    process_log(kernel->scheduler.scheduled_proc->name,
+                                kernel->scheduler.scheduled_proc->remaining,
+                                pc,
+                                seg->id,
+                                kernel->scheduler.scheduled_proc->o_files->size);
+                    sem_post(&log_mutex);
+                    sem_post(&refresh_sem);
+
+                    eval(kernel->scheduler.scheduled_proc, &instr);
+                }
+            } while (kernel->scheduler.scheduled_proc != NULL
+                     && kernel->scheduler.scheduled_proc->pc
+                            < kernel->scheduler.scheduled_proc->code_len);
+
+            if (kernel->scheduler.scheduled_proc == NULL)
+                continue;
+
+            if (kernel->scheduler.scheduled_proc->pc
+                >= kernel->scheduler.scheduled_proc->code_len)
+                sysCall(PROCESS_FINISH, kernel->scheduler.scheduled_proc);
+            else
+                sysCall(PROCESS_INTERRUPT, (void*)QUANTUM_COMPLETED);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------

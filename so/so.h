@@ -1,11 +1,11 @@
 #ifndef SO_H
 #define SO_H
 
+#include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <semaphore.h>
-#include <pthread.h>
 
 #include "../terminal/terminal.h"
 
@@ -16,7 +16,7 @@
 
 #define K 1024
 #define TAMANHO_PAGINA 8 * K
-#define TAMANHO_MAX_MEMORIA K * K * K // 1 GB = 1 * 1024 * 1024 * 1024
+#define TAMANHO_MAX_MEMORIA K *K *K // 1 GB = 1 * 1024 * 1024 * 1024
 
 // FUNÇÕES DO KERNEL
 #define PROCESS_INTERRUPT '1'
@@ -92,12 +92,13 @@ struct processo {
 
     // Legado
     int id;
-    clock_t tempoRestante;
+    clock_t tempo;
     clock_t tempoChegada;
 
     char estado;
     int pc;
     int numComandos;
+    INSTRUCAO* codigo;
 
     struct processo *prox; // Lista de processos
 };
@@ -127,7 +128,7 @@ struct segmento {
 };
 
 struct tabela_segmento {
-    SEGMENTO* segmentos;
+    SEGMENTO *segmentos;
     int quantSegmentos;
     int memoriaRestante;
     int atual;
@@ -171,13 +172,14 @@ void processFinish(PCB *lista);
 PROCESSO *buscaProcessoID(PCB pcb, int id);
 // ---------------------------------------------------------------------------------------------
 
-// ------------------------------------- FUNÇÕES INSTRUÇÃO -------------------------------------
+// ------------------------------------- FUNÇÕES LOG -------------------------------------------
+
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
 TABELA_SEGMENTO iniciaTabelaSegmentos();
-MEMORIA * memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
-void memoriaLoadRequest(MEMORIA *memReq);
+MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
+void memoriaLoadRequest(PROCESSO *processo);
 void trocaPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
 // ---------------------------------------------------------------------------------------------
@@ -188,11 +190,13 @@ void sysCall(char function, void *arg);
 void interruptControl(char function, void *arg);
 // ---------------------------------------------------------------------------------------------
 
-// ----------------------------------- FUNÇÕES ROUND-ROBIN --------------------------------------
-void iniciaRR();
-void adicionaProcesso();
-void desbloqueiaProcesso();
+// ----------------------------------- FUNÇÕES CPU --------------------------------------
+void iniciaRR(); // TODO
+void adicionaProcesso(); // TODO
+void desbloqueiaProcesso(); // TODO
+void cpu_init();
+void cpu();
 // ---------------------------------------------------------------------------------------------
 
 
-#endif //SO_H
+#endif // SO_H

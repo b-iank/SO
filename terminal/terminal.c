@@ -18,14 +18,8 @@ int main_menu() {
     } while (op > 3 || op < 0);
 }
 
-void sucesso(char *mensagem) {
-    printf("%s\n", mensagem);
-}
+void sucesso(char *mensagem) { printf("%s\n", mensagem); }
 
-void alerta(char *mensagem) {
-    printf("%s\n", mensagem);
-}
+void alerta(char *mensagem) { printf("%s\n", mensagem); }
 
-void erro(char *mensagem) {
-    printf("%s\n", mensagem);
-}
+void erro(char *mensagem) { printf("%s\n", mensagem); }

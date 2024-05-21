@@ -8,21 +8,30 @@ clock_t inicio;
 
 KERNEL *kernel;
 
-int main() {
-    int op;
-    char fileName[255];
+void tela();
 
+int main() {
     inicio = clock();
 
-    //process_log_init();
+    // process_log_init();
     // memory_log_init();
 
-     kernel = iniciaKernel();
-
+    kernel = iniciaKernel();
 
     // disk_init();
-    // cpu_init();
 
+    cpu_init();
+
+    pthread_t menu;
+
+    pthread_create(&menu, NULL, (void*) tela, NULL);
+
+    return 0;
+}
+
+void tela() {
+    int op;
+    char fileName[255];
     do {
         op = main_menu();
         if (op == 1) {
@@ -37,5 +46,4 @@ int main() {
             printf("Adeus Aleardo :D");
         }
     } while (op != 0);
-    return 0;
 }
