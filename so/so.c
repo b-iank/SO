@@ -27,7 +27,7 @@ void novoSemaforo(char nome) {
     }
 
     semaforo->nome = nome;
-    semaforo->S = 1; // TODO ?
+    semaforo->S = 1;
     semaforo->aguardando = 0;
     sem_init(&semaforo->mutex, 0, 1);
 
@@ -123,9 +123,9 @@ PCB iniciaPCB() {
     return pcb;
 }
 
-PCB *add_process(PCB *TCP, PROCESSO *processo) {
-    PCB *lista_aux = TCP;
-    PROCESSO *head = lista_aux->head, *aux = head, *anterior = lista_aux->tail;
+PCB add_process(PROCESSO *processo) {
+    PCB lista_aux = kernel->pcb;
+    PROCESSO *head = lista_aux.head, *aux = head, *anterior = lista_aux.tail;
 
     if (head == NULL) {
         lista_aux->head = processo;
@@ -164,9 +164,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
     (*process)->id = kernel->proxId++; // Pega o próximo id de processo e soma a variável
     (*process)->pc = 0;
     (*process)->estado = NOVO;
-    (*process)->tempo = (QUANTUM_TIME / (*process)->prioridade);
-    (*process)->tempoChegada = clock();
-
+    (*process)->tempoMaximo = (QUANTUM_TIME / (*process)->prioridade);
     (*process)->quantidadeSemaforos = 0;
     while (1) {
         char semaforo;
@@ -239,7 +237,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
                 exit(EXIT_FAILURE);
             }
             (*code)[i].value = right_op;
-            (*code)[i].sem = '#'; // TODO: podemos usar # pra 'não semaforo'?
+            (*code)[i].sem = '#';
         }
         i++;
     }
@@ -248,7 +246,8 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
 }
 
 
-void processInterrupt(PCB *BCP) {
+void processInterrupt() {
+    PCB *BCP = &kernel->pcb;
     printf("Interrupcao do PROCESSO %d\n", BCP->atual->id);
 
     if (BCP->atual->tempo <= 0) {
@@ -256,7 +255,10 @@ void processInterrupt(PCB *BCP) {
     }
 }
 
-void processFinish(PCB *BCP) { printf("Finalizando o PROCESSO %d\n", BCP->atual->id); }
+void processFinish() {
+    PCB *BCP = &kernel->pcb;
+    printf("Finalizando o PROCESSO %d\n", BCP->atual->id);
+}
 
 PROCESSO *buscaProcessoID(PCB pcb, int id) {
     PROCESSO *busca = pcb.head;
@@ -362,17 +364,13 @@ KERNEL *iniciaKernel() {
 
     kernel->pcb = iniciaPCB();
     kernel->proxId = 1; /* 0 is for the kernel */
-    kernel->pc = 0; // TODO ?
+    kernel->pc = 0;
 
     kernel->seg_table = iniciaTabelaSegmentos();
 
-    // scheduler_init(&kernel->scheduler); // TODO
-
-    // disk_scheduler_init(&kernel->disk_scheduler);
+    kernel->scheduler = iniciaScheduler();
 
     kernel->tabelaSemaforo = iniciaTabelaSemaforo();
-
-    // file_table_init(&kernel->file_table);
 
     return kernel;
 }
@@ -384,6 +382,9 @@ void sysCall(char function, void *arg) {
         }
         case PROCESS_CREATE: {
             processCreate((char *) arg);
+            break;
+        }
+        case PROCESS_FINISH: {
             break;
         }
         case MEMORY_LOAD_REQUEST: {
@@ -423,7 +424,7 @@ void sysCall(char function, void *arg) {
 static void sleep() { sysCall(PROCESS_INTERRUPT, (void *) 0x4); }
 
 static void wakeup(PROCESSO *processo) {
-    // desbloqueiaProcesso(&kernel->scheduler, processo); // TODO: implementar
+    processo->estado = PRONTO;
 }
 
 void interruptControl(char function, void *arg) {
@@ -445,18 +446,6 @@ void interruptControl(char function, void *arg) {
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES CPU -------------------------------------------
-void iniciaRR() {
-    return;
-}
-
-void adicionaProcesso() {
-    return;
-}
-
-void desbloqueiaProcesso() {
-    return;
-}
-
 void cpu_init() {
     pthread_t cpu_id;
     pthread_attr_t cpu_attr;
@@ -478,14 +467,13 @@ _Noreturn void cpu() {
 
     int no_process = 0;
     while (1) {
-        if (!kernel->scheduler.scheduled_proc) {
+        if (!kernel->scheduler.scheduled) {
             if (!no_process) {
-                sem_post(&log_mutex);
-                sem_post(&refresh_sem);
+                //sem_post(&refresh_sem);
                 no_process = 1;
             }
 
-            schedule_process(&kernel->scheduler, NONE);
+            schedule_process(NONE);
         }
         else {
             no_process = 0;
@@ -498,34 +486,32 @@ _Noreturn void cpu() {
                     start = end;
 
                     const int pc
-                        = FETCH_INSTR_ADDR(kernel->scheduler.scheduled_proc);
-                    const int page_number = PAGE_NUMBER(pc);
-                    const int page_offset = PAGE_OFFSET(pc);
+                        = FETCH_INSTR_ADDR(kernel->scheduler.scheduled->processo);
 
-                    /* It set the used bit if it is not set */
-                    if (!page->used)
-                        page->used = 1;
+//                    if (!page->used)
+//                        page->used = 1;
 
-                    process_log(kernel->scheduler.scheduled_proc->name,
-                                kernel->scheduler.scheduled_proc->remaining,
-                                pc,
-                                seg->id,
-                                kernel->scheduler.scheduled_proc->o_files->size);
-                    sem_post(&log_mutex);
-                    sem_post(&refresh_sem);
+//                    process_log(kernel->scheduler.scheduled_proc->name,
+//                                kernel->scheduler.scheduled_proc->remaining,
+//                                pc,
+//                                seg->id,
+//                                kernel->scheduler.scheduled_proc->o_files->size);
+//                    sem_post(&log_mutex);
+//                    sem_post(&refresh_sem);
 
-                    eval(kernel->scheduler.scheduled_proc, &instr);
+                    avalia(kernel->scheduler.scheduled->processo);
                 }
-            } while (kernel->scheduler.scheduled_proc != NULL
-                     && kernel->scheduler.scheduled_proc->pc
-                            < kernel->scheduler.scheduled_proc->code_len);
+            } while (kernel->scheduler.scheduled != NULL
+                     && kernel->scheduler.scheduled->processo->tempoRestante > 0
+                     && kernel->scheduler.scheduled->processo->pc
+                            < kernel->scheduler.scheduled->processo->numComandos);
 
-            if (kernel->scheduler.scheduled_proc == NULL)
+            if (kernel->scheduler.scheduled == NULL)
                 continue;
 
-            if (kernel->scheduler.scheduled_proc->pc
-                >= kernel->scheduler.scheduled_proc->code_len)
-                sysCall(PROCESS_FINISH, kernel->scheduler.scheduled_proc);
+            if (kernel->scheduler.scheduled->processo->pc
+                >= kernel->scheduler.scheduled->processo->numComandos)
+                sysCall(PROCESS_FINISH, kernel->scheduler.scheduled);
             else
                 sysCall(PROCESS_INTERRUPT, (void*)QUANTUM_COMPLETED);
         }

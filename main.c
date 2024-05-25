@@ -18,8 +18,6 @@ int main() {
 
     kernel = iniciaKernel();
 
-    // disk_init();
-
     cpu_init();
 
     pthread_t menu;
@@ -36,7 +34,7 @@ void tela() {
         op = main_menu();
         if (op == 1) {
             scanf("%s", fileName);
-            processInterrupt(&kernel->pcb);
+            processInterrupt();
             sysCall(PROCESS_CREATE, fileName);
         } else if (op == 2) {
             // a

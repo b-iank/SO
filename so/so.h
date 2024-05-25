@@ -49,10 +49,13 @@
 #define SEM_V '6'
 
 // SCHEDULER
-#define NONE = 0x0
-#define IO_REQUESTED = 0x1
-#define QUANTUM_COMPLETED = 0x2
-#define SEMAPHORE_BLOCKED = 0x4
+#define NONE 0x0
+#define IO_REQUESTED 0x1
+#define QUANTUM_COMPLETED 0x2
+#define SEMAPHORE_BLOCKED 0x4
+
+#define ONE_SECOND_NS (1000000000L)
+#define FETCH_INSTR_ADDR(x) ((x)->pc++)
 
 typedef struct semaforo SEMAFORO;
 typedef struct tabela_semaforo TABELA_SEMAFORO;
@@ -141,9 +144,6 @@ struct kernel {
     /* Tabela de Segmentos */
     TABELA_SEGMENTO seg_table;
 
-    /* Scheduler Information */
-    // scheduler_t scheduler;
-
     /* Tabela de Semaforos */
     TABELA_SEMAFORO tabelaSemaforo; // <- Guarda a tabela de semáforo
 
@@ -190,10 +190,7 @@ void sysCall(char function, void *arg);
 void interruptControl(char function, void *arg);
 // ---------------------------------------------------------------------------------------------
 
-// ----------------------------------- FUNÇÕES CPU --------------------------------------
-void iniciaRR(); // TODO
-void adicionaProcesso(); // TODO
-void desbloqueiaProcesso(); // TODO
+// ----------------------------------- FUNÇÕES CPU --------------------------------------------
 void cpu_init();
 void cpu();
 // ---------------------------------------------------------------------------------------------
