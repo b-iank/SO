@@ -15,7 +15,7 @@
 #define QUANTUM_TIME 5000
 
 #define K 1024
-#define TAMANHO_PAGINA 8 * K
+#define TAMANHO_PAGINA (8 * K)
 #define TAMANHO_MAX_MEMORIA K *K *K // 1 GB = 1 * 1024 * 1024 * 1024
 
 // FUNÇÕES DO KERNEL
@@ -69,6 +69,9 @@ typedef struct memoria MEMORIA;
 typedef struct segmento SEGMENTO;
 typedef struct tabela_segmento TABELA_SEGMENTO;
 
+typedef struct scheduler SCHEDULER;
+typedef struct processo_scheduler PROCESSO_SCHEDULER;
+
 typedef struct kernel KERNEL;
 
 struct semaforo {
@@ -94,16 +97,16 @@ struct processo {
     int quantidadeSemaforos;
 
     // Legado
-    int id;
-    clock_t tempo;
-    clock_t tempoChegada;
+    int id; // tempo maximo - (tempo atual - tempo chegada) -> 5000 - (1700 - 1500)
+    int tempoMaximo;
+    int tempoRestante;
 
     char estado;
     int pc;
     int numComandos;
     INSTRUCAO* codigo;
 
-    struct processo *prox; // Lista de processos
+    PROCESSO *prox; // Lista de processos
 };
 
 struct pcb {
@@ -137,6 +140,18 @@ struct tabela_segmento {
     int atual;
 };
 
+struct processo_scheduler {
+    PROCESSO *processo;
+    PROCESSO_SCHEDULER *prox;
+};
+
+struct scheduler {
+    PROCESSO_SCHEDULER *head;
+    PROCESSO_SCHEDULER *tail;
+    PROCESSO_SCHEDULER *scheduled;
+    PROCESSO_SCHEDULER *bloqueados;
+};
+
 struct kernel {
     PCB pcb; // <- Bloco de controle de processos
     int proxId; // <- Guarda o próximo id de processo
@@ -146,6 +161,8 @@ struct kernel {
 
     /* Tabela de Semaforos */
     TABELA_SEMAFORO tabelaSemaforo; // <- Guarda a tabela de semáforo
+
+    SCHEDULER scheduler;
 
     int pc; // <- Program Counter
 };
@@ -164,12 +181,13 @@ void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *));
 
 // ------------------------------------- FUNÇÕES PROCESSO --------------------------------------
 PCB iniciaPCB();
-PCB *add_process(PCB *lista, PROCESSO *processo);
+PCB add_process(PROCESSO *processo);
 void readSyntheticProgram(FILE *, PROCESSO **, INSTRUCAO **);
 void processCreate(char *fileName);
-void processInterrupt(PCB *lista);
-void processFinish(PCB *lista);
-PROCESSO *buscaProcessoID(PCB pcb, int id);
+void processInterrupt();
+void processFinish();
+PROCESSO *buscaProcessoID(int id);
+void avalia(PROCESSO *processo);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES LOG -------------------------------------------
@@ -183,6 +201,13 @@ void memoriaLoadRequest(PROCESSO *processo);
 void trocaPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
 // ---------------------------------------------------------------------------------------------
+
+// ------------------------------------- FUNÇÕES SCHEDULER --------------------------------------
+SCHEDULER iniciaScheduler();
+SCHEDULER add_process_scheduler(PROCESSO *processo);
+void schedule_process(int flag);
+// ---------------------------------------------------------------------------------------------
+
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
 KERNEL *iniciaKernel();

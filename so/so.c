@@ -90,7 +90,7 @@ void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *)) {
         int id = semaforo->idAguardando[0], aux;
         for (int i = 0; i < semaforo->aguardando; i++)
             semaforo->idAguardando[i] = semaforo->idAguardando[i + 1];
-        PROCESSO *aguardando = buscaProcessoID(kernel->pcb, id);
+        PROCESSO *aguardando = buscaProcessoID(id);
         wakeup(aguardando);
     }
     sem_post(&semaforo->mutex);
@@ -128,8 +128,8 @@ PCB add_process(PROCESSO *processo) {
     PROCESSO *head = lista_aux.head, *aux = head, *anterior = lista_aux.tail;
 
     if (head == NULL) {
-        lista_aux->head = processo;
-        lista_aux->tail = processo;
+        lista_aux.head = processo;
+        lista_aux.tail = processo;
         processo->prox = processo;
         return lista_aux;
     }
@@ -143,9 +143,9 @@ PCB add_process(PROCESSO *processo) {
     anterior->prox = processo;
 
     if (processo->prioridade < head->prioridade)
-        lista_aux->head = processo;
-    if (processo->prox == lista_aux->head)
-        lista_aux->tail = processo;
+        lista_aux.head = processo;
+    if (processo->prox == lista_aux.head)
+        lista_aux.tail = processo;
 
     return lista_aux;
 }
@@ -250,7 +250,7 @@ void processInterrupt() {
     PCB *BCP = &kernel->pcb;
     printf("Interrupcao do PROCESSO %d\n", BCP->atual->id);
 
-    if (BCP->atual->tempo <= 0) {
+    if (BCP->atual->tempoMaximo <= 0) {
         processFinish(BCP);
     }
 }
@@ -260,8 +260,8 @@ void processFinish() {
     printf("Finalizando o PROCESSO %d\n", BCP->atual->id);
 }
 
-PROCESSO *buscaProcessoID(PCB pcb, int id) {
-    PROCESSO *busca = pcb.head;
+PROCESSO *buscaProcessoID(int id) {
+    PROCESSO *busca = kernel->pcb.head;
     while (busca) {
         if (busca->id == id)
             return busca;
@@ -353,6 +353,84 @@ void adicionaTabelaSegmentos(SEGMENTO *segmento) {
 
 // ---------------------------------------------------------------------------------------------
 
+// ------------------------------------- FUNÇÕES SCHEDULER -------------------------------------
+SCHEDULER add_process_scheduler(PROCESSO *processo) {
+    SCHEDULER scheduler = kernel->scheduler;
+    PROCESSO_SCHEDULER *head = scheduler.head, *anterior = scheduler.tail;
+
+    PROCESSO_SCHEDULER *novo = malloc(sizeof (PROCESSO_SCHEDULER));
+    if (!novo) {
+        erro("Sem memoria");
+        exit(EXIT_FAILURE);
+    }
+    novo->processo = processo;
+    novo->prox = NULL;
+
+    if (head == NULL) {
+        scheduler.head = novo;
+        scheduler.tail = novo;
+        scheduler.head->prox = scheduler.tail;
+        scheduler.tail->prox = scheduler.head;
+        return scheduler;
+    }
+
+    PROCESSO_SCHEDULER *aux = scheduler.head;
+    PROCESSO *aux_processo = aux->processo;
+    while (processo->prioridade > aux_processo->prioridade && aux->prox != head) {
+        anterior = aux;
+        aux = aux->prox;
+        aux_processo = aux->processo;
+    }
+
+    novo->prox = aux;
+    anterior->prox = novo;
+
+    if (processo->prioridade < head->processo->prioridade)
+        scheduler.head = novo;
+    if (novo->prox == scheduler.head)
+        scheduler.tail = novo;
+
+    return scheduler;
+}
+
+void schedule_process(int flag) {
+    SCHEDULER scheduler = kernel->scheduler;
+    PROCESSO_SCHEDULER *atual = scheduler.scheduled, *novo = NULL;
+
+    PROCESSO_SCHEDULER *aux = atual;
+    while (aux && aux->prox->processo->estado == BLOQUEADO && aux->prox != atual)
+        aux = aux->prox;
+
+    if (aux && aux->prox != atual) {
+        novo = atual->prox;
+        novo->processo->tempoRestante = novo->processo->tempoMaximo;
+    }
+
+    if (atual) {
+        if (flag == IO_REQUESTED || flag == SEMAPHORE_BLOCKED) {
+            atual->processo->estado = BLOQUEADO;
+        } else if (flag == QUANTUM_COMPLETED) {
+            atual->processo->estado = PRONTO;
+        }
+    }
+
+    if (novo)
+        novo->processo->estado = EXECUTANDO;
+
+    scheduler.scheduled = novo;
+}
+
+SCHEDULER iniciaScheduler() {
+    SCHEDULER scheduler;
+    scheduler.scheduled = NULL;
+    scheduler.head = NULL;
+    scheduler.tail = NULL;
+    scheduler.bloqueados = NULL;
+
+    return scheduler;
+}
+// ---------------------------------------------------------------------------------------------
+
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
 KERNEL *iniciaKernel() {
     kernel = (KERNEL *) malloc(sizeof(KERNEL));
@@ -432,8 +510,10 @@ void interruptControl(char function, void *arg) {
         case MEMORY_LOAD_FINISH: {
             PROCESSO *processo = (PROCESSO *) arg;
 
-            add_process(&kernel->pcb, processo);
+            kernel->pcb = add_process(processo); // Adiciona o processo na PCB
             processo->estado = PRONTO;
+
+            add_process_scheduler(processo);
             break;
         }
         default: {
