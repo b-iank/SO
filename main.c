@@ -34,7 +34,7 @@ void tela() {
         op = main_menu();
         if (op == 1) {
             scanf("%s", fileName);
-            processInterrupt();
+            sysCall(PROCESS_INTERRUPT, NONE);
             sysCall(PROCESS_CREATE, fileName);
         } else if (op == 2) {
             printaProcessos();

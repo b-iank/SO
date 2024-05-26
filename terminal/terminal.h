@@ -6,6 +6,7 @@
 #include <string.h>
 
 int main_menu();
+void printaProcesso(int id, char nome[50], char estado, int prioridade);
 void sucesso(char *mensagem);
 void alerta(char *mensagem);
 void erro(char *mensagem);

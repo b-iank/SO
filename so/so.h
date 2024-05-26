@@ -186,14 +186,9 @@ PCB iniciaPCB();
 PCB add_process(PROCESSO *processo);
 void readSyntheticProgram(FILE *, PROCESSO **, INSTRUCAO **);
 void processCreate(char *fileName);
-void processInterrupt();
-void processFinish();
+void processFinish(PROCESSO *processo);
 PROCESSO *buscaProcessoID(int id);
 void avalia(PROCESSO *processo);
-// ---------------------------------------------------------------------------------------------
-
-// ------------------------------------- FUNÇÕES LOG -------------------------------------------
-
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
@@ -202,14 +197,20 @@ MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
 void memoriaLoadRequest(PROCESSO *processo);
 void trocaPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
+void freeSegmento(int idSegmento);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES SCHEDULER --------------------------------------
 SCHEDULER iniciaScheduler();
 SCHEDULER add_process_scheduler(PROCESSO *processo);
 void schedule_process(int flag);
+void removeScheduler(PROCESSO *processo);
 // ---------------------------------------------------------------------------------------------
 
+// ------------------------------------- FUNÇÕES LOG -------------------------------------------
+void printaProcessos();
+void printaMemoria();
+// ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
 KERNEL *iniciaKernel();

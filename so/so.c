@@ -8,6 +8,9 @@ static void sleep();
 
 static void wakeup(PROCESSO *proc);
 
+void printaProcesso(int id, char nome[50], char estado, int prioridade);
+void printaSegmento(int id, int quantidade);
+
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 TABELA_SEMAFORO iniciaTabelaSemaforo() {
     TABELA_SEMAFORO tabelaSemaforo;
@@ -245,19 +248,20 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
     fclose(arquivo);
 }
 
+void processFinish(PROCESSO *processo) {
+    if (processo) {
+        PROCESSO *busca = kernel->pcb.head;
+        while (busca->id != processo->id)
+            busca = busca->prox;
+        if (kernel->scheduler.scheduled->processo->id == processo->id)
+            sysCall(PROCESS_INTERRUPT, NONE);
 
-void processInterrupt() {
-    PCB *BCP = &kernel->pcb;
-    printf("Interrupcao do PROCESSO %d\n", BCP->atual->id);
+        freeSegmento(processo->idSegmento);
+        removeScheduler(processo);
 
-    if (BCP->atual->tempoMaximo <= 0) {
-        processFinish(BCP);
+        free(processo->codigo);
+        free(processo);
     }
-}
-
-void processFinish() {
-    PCB *BCP = &kernel->pcb;
-    printf("Finalizando o PROCESSO %d\n", BCP->atual->id);
 }
 
 PROCESSO *buscaProcessoID(int id) {
@@ -391,9 +395,39 @@ void adicionaTabelaSegmentos(SEGMENTO *segmento) {
     tabelaSegmentos->segmentos[i - 1] = *segmento;
 }
 
+void freeSegmento(int idSegmento) {
+    TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
+    tabelaSegmento.quantSegmentos--;
+
+    int qtd = tabelaSegmento.quantSegmentos, indice;
+    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++);
+
+    SEGMENTO segmento = tabelaSegmento.segmentos[indice];
+    tabelaSegmento.memoriaRestante = MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento.memoriaRestante + segmento.paginaQuantMemoria);
+
+    for (; indice < qtd-1; indice++)
+        tabelaSegmento.segmentos[indice] = tabelaSegmento.segmentos[indice+1];
+
+    // Realoca a tabela de segmentos para quantidade - 1
+    tabelaSegmento.segmentos = (SEGMENTO *) realloc(tabelaSegmento.segmentos, sizeof(SEGMENTO) * (qtd-1));
+    if (!tabelaSegmento.segmentos) {
+        erro("Sem memoria");
+        exit(EXIT_FAILURE);
+    }
+}
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES SCHEDULER -------------------------------------
+SCHEDULER iniciaScheduler() {
+    SCHEDULER scheduler;
+    scheduler.scheduled = NULL;
+    scheduler.head = NULL;
+    scheduler.tail = NULL;
+    scheduler.bloqueados = NULL;
+
+    return scheduler;
+}
+
 SCHEDULER add_process_scheduler(PROCESSO *processo) {
     SCHEDULER scheduler = kernel->scheduler;
     PROCESSO_SCHEDULER *head = scheduler.head, *anterior = scheduler.tail;
@@ -460,15 +494,50 @@ void schedule_process(int flag) {
     scheduler.scheduled = novo;
 }
 
-SCHEDULER iniciaScheduler() {
-    SCHEDULER scheduler;
-    scheduler.scheduled = NULL;
-    scheduler.head = NULL;
-    scheduler.tail = NULL;
-    scheduler.bloqueados = NULL;
-
-    return scheduler;
+void removeScheduler(PROCESSO *processo) {
+    SCHEDULER scheduler = kernel->scheduler;
+    PROCESSO_SCHEDULER *removido = scheduler.head, *prev = scheduler.tail;
+    while (removido->processo->id != processo->id) {
+        prev = prev->prox;
+        removido = removido->prox;
+    }
+    prev->prox = removido->prox;
+    free(removido);
 }
+// ---------------------------------------------------------------------------------------------
+
+// ------------------------------------- FUNÇÕES LOG -------------------------------------------
+void printaProcessos() {
+    PCB pcb = kernel->pcb;
+    PROCESSO *processo = pcb.head;
+    if (processo) {
+        printf("┌─────────────────────────────────────────────────────────────────────────────────┐\n");
+        printf("│%-5s │ %-50s │ %-10s │ %-10s│\n", "ID", "Nome", "Estado", "Prioridade");
+        printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+        printaProcesso(processo->id, processo->nome, processo->estado, processo->prioridade);
+        while (processo->prox != pcb.head) {
+            processo = processo->prox;
+            printaProcesso(processo->id, processo->nome, processo->estado, processo->prioridade);
+        }
+    }
+}
+
+void printaMemoria() {
+    TABELA_SEGMENTO table = kernel->seg_table;
+    int atual = table.atual;
+
+    printf("┌───────────────────────────┐\n");
+    printf("│%-27s│\n", "SEGMENTOS");
+    printf("└───────────────────────────┘\n");
+    printf("│%-5s │ %-10s │\n", "ID", "Quantidade Páginas");
+    for (int i = 0; i < table.quantSegmentos; i++) {
+        printaSegmento(table.segmentos[i].id, table.segmentos[i].paginaQuantMemoria);
+    }
+
+    printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+    while(!getchar());
+}
+
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
@@ -496,6 +565,8 @@ KERNEL *iniciaKernel() {
 void sysCall(char function, void *arg) {
     switch (function) {
         case PROCESS_INTERRUPT: {
+            pthread_mutex_lock(&criacao);
+            schedule_process((int) arg);
             break;
         }
         case PROCESS_CREATE: {
@@ -503,6 +574,7 @@ void sysCall(char function, void *arg) {
             break;
         }
         case PROCESS_FINISH: {
+            processFinish((PROCESSO *) arg);
             break;
         }
         case MEMORY_LOAD_REQUEST: {
@@ -518,21 +590,6 @@ void sysCall(char function, void *arg) {
             V((SEMAFORO *) arg, wakeup);
             break;
         }
-            // case DISK_REQUEST: {
-            //     break;
-            // }
-            // case DISK_FINISH: {
-            //     break;
-            // }
-            // case PRINT_REQUEST: {
-            //     break;
-            // }
-            // case FILE_SYSTEM_REQUEST: {
-            //     break;
-            // }
-            // case FILE_SYSTEM_FINISH: {
-            //     break;
-            // }
         default: { // delete(System32);
             break;
         }
