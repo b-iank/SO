@@ -4,6 +4,8 @@
 
 int ID_SEGMENTOS = 0;
 
+pthread_mutex_t criacao;
+
 static void sleep();
 
 static void wakeup(PROCESSO *proc);
@@ -102,17 +104,15 @@ void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *)) {
 
 // ------------------------------------- FUNÇÕES PROCESSO --------------------------------------
 void processCreate(char *fileName) {
-    FILE *fp = fopen(fileName, "r");
+    FILE *fp;
     PROCESSO *process = NULL;
-    INSTRUCAO *code = NULL;
 
     if (!(fp = fopen(fileName, "r"))) {
-        exit(EXIT_FAILURE);
+        alerta("Arquivo nao encontrado");
+        return;
     }
 
-    readSyntheticProgram(fp, &process, &code);
-
-    process->codigo = code;
+    readSyntheticProgram(fp, &process);
 
     sysCall(MEMORY_LOAD_REQUEST, (void *) &process);
 }
@@ -153,7 +153,28 @@ PCB add_process(PROCESSO *processo) {
     return lista_aux;
 }
 
-void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
+int findnum_lines(FILE* fp){
+
+    int num_lines = 0;
+    int line; // changed char to int
+    int size;
+
+    size = ftell(fp);
+    line = getc(fp);
+    if(size != 0){
+        while(line != EOF){
+            if(line == '\n'){
+                num_lines = num_lines + 1;
+            }
+            line = getc(fp);
+        }
+    } else {
+        num_lines = 0;
+    }
+    return num_lines;
+}
+
+void readSyntheticProgram(FILE *arquivo, PROCESSO **process) {
     long int code_section;
     int countCode;
     long tamanhoArquivo;
@@ -161,7 +182,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
     (*process) = malloc(sizeof(PROCESSO));
 
     // Le cabecalho
-    fscanf(arquivo, "%s %d %d %d", (*process)->nome, &(*process)->idSegmento, &(*process)->prioridade,
+    fscanf(arquivo, "%s %d %d %d\n", (*process)->nome, &(*process)->idSegmento, &(*process)->prioridade,
            &(*process)->tamanhoSegmento);
 
     (*process)->id = kernel->proxId++; // Pega o próximo id de processo e soma a variável
@@ -171,8 +192,12 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
     (*process)->quantidadeSemaforos = 0;
     while (1) {
         char semaforo;
-        if (fscanf(arquivo, "%c", &semaforo) != 1)
+        fscanf(arquivo, "%c", &semaforo);
+        if (semaforo == '\n')
             break;
+
+        if (semaforo == ' ')
+            continue;
 
         if (existeSemaforoProcesso(semaforo, *process)) {
             char *mensagem = malloc(21);
@@ -184,25 +209,16 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
         (*process)->semaforos[(*process)->quantidadeSemaforos++] = semaforo;
         novoSemaforo(semaforo);
     }
-
-    // Le codigo
+    fgetc(arquivo);
     code_section = ftell(arquivo);
-    countCode = 0;
-    fseek(arquivo, 0, SEEK_END); // Move o ponteiro para o final do arquivo
-    tamanhoArquivo = ftell(arquivo); // Obtém o tamanho total do arquivo
-
-    // Conta a quantidade de linhas restantes
-    while (ftell(arquivo) < tamanhoArquivo) {
-        if (fgetc(arquivo) == '\n') {
-            countCode++;
-        }
-    }
+    countCode = findnum_lines(arquivo) + 1;
 
     fseek(arquivo, code_section, SEEK_SET);
 
-    (*code) = (INSTRUCAO *) malloc(sizeof(INSTRUCAO) * (countCode));
 
-    if (!(*code)) {
+    INSTRUCAO *code = (INSTRUCAO *) malloc(sizeof(INSTRUCAO) * (countCode));
+
+    if (!code) {
         alerta("Sem memoria");
         exit(EXIT_FAILURE);
     }
@@ -217,34 +233,35 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process, INSTRUCAO **code) {
                 char mensagem[255];
                 sprintf(mensagem, "O semaforo %c nao existe.", comando[2]);
                 erro(mensagem);
-                exit(EXIT_FAILURE);
+                return; // TODO: mata processo
             }
-            (*code)[i].op = comando[0] == 'P' ? SEM_P : SEM_V;
-            (*code)[i].sem = comando[2];
-        } else { // exec 1000
+            code[i].op = comando[0] == 'P' ? SEM_P : SEM_V;
+            code[i].sem = comando[2];
+        } else {
             char *left_op = malloc(sizeof(char) * 6);
             int right_op;
 
             sscanf(comando, "%s %d", left_op, &right_op);
 
             if (strcmp(left_op, "exec") == 0)
-                (*code)[i].op = EXEC;
+                code[i].op = EXEC;
             else if (strcmp(left_op, "read") == 0)
-                (*code)[i].op = READ;
+                code[i].op = READ;
             else if (strcmp(left_op, "write") == 0)
-                (*code)[i].op = WRITE;
+                code[i].op = WRITE;
             else if (strcmp(left_op, "print") == 0)
-                (*code)[i].op = PRINT;
+                code[i].op = PRINT;
             else {
                 erro("Operacao invalida");
-                exit(EXIT_FAILURE);
+                return; // TODO: matar processo
             }
-            (*code)[i].value = right_op;
-            (*code)[i].sem = '#';
+            code[i].value = right_op;
+            code[i].sem = '#';
         }
         i++;
     }
 
+    (*process)->codigo = code;
     fclose(arquivo);
 }
 
@@ -298,18 +315,6 @@ void avalia(PROCESSO *processo) {
         case SEM_V: {
             sysCall(SEMAPHORE_V, buscaSemaforo(instr->sem));
             processo->tempoRestante = MAX(0, processo->tempoRestante - 200);
-            break;
-        }
-        case READ: {
-            // sysCall(DISK_READ_REQUEST, instr->value);
-            break;
-        }
-        case WRITE: {
-            // sysCall(DISK_WRITE_REQUEST, instr->value);
-            break;
-        }
-        case PRINT: {
-            // sysCall(PRINT_REQUEST, (void*) instr->value);
             break;
         }
     }
@@ -399,8 +404,7 @@ void freeSegmento(int idSegmento) {
     TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
     tabelaSegmento.quantSegmentos--;
 
-    int qtd = tabelaSegmento.quantSegmentos, indice;
-    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++);
+    int qtd = tabelaSegmento.quantSegmentos, indice = buscaSegmento(idSegmento);
 
     SEGMENTO segmento = tabelaSegmento.segmentos[indice];
     tabelaSegmento.memoriaRestante = MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento.memoriaRestante + segmento.paginaQuantMemoria);
@@ -414,6 +418,15 @@ void freeSegmento(int idSegmento) {
         erro("Sem memoria");
         exit(EXIT_FAILURE);
     }
+}
+
+int buscaSegmento(int idSegmento) {
+    TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
+
+    int qtd = tabelaSegmento.quantSegmentos, indice;
+    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++);
+
+    return indice;
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -520,22 +533,27 @@ void printaProcessos() {
             printaProcesso(processo->id, processo->nome, processo->estado, processo->prioridade);
         }
     }
+    printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+    while (!getchar())
+        ;
 }
 
 void printaMemoria() {
     TABELA_SEGMENTO table = kernel->seg_table;
-    int atual = table.atual;
 
-    printf("┌───────────────────────────┐\n");
-    printf("│%-27s│\n", "SEGMENTOS");
-    printf("└───────────────────────────┘\n");
-    printf("│%-5s │ %-10s │\n", "ID", "Quantidade Páginas");
-    for (int i = 0; i < table.quantSegmentos; i++) {
-        printaSegmento(table.segmentos[i].id, table.segmentos[i].paginaQuantMemoria);
+    if (table.quantSegmentos > 0){
+        printf("┌───────────────────────────┐\n");
+        printf("│%-27s│\n", "SEGMENTOS");
+        printf("└───────────────────────────┘\n");
+        printf("│%-5s │ %-10s │\n", "ID", "Quantidade Páginas");
+        for (int i = 0; i < table.quantSegmentos; i++) {
+            printaSegmento(table.segmentos[i].id, table.segmentos[i].paginaQuantMemoria);
+        }
+
+        printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+        while (!getchar())
+            ;
     }
-
-    printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
-    while(!getchar());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -567,9 +585,11 @@ void sysCall(char function, void *arg) {
         case PROCESS_INTERRUPT: {
             pthread_mutex_lock(&criacao);
             schedule_process((int) arg);
+            // chega
             break;
         }
         case PROCESS_CREATE: {
+            // chega
             processCreate((char *) arg);
             break;
         }
@@ -665,16 +685,8 @@ _Noreturn void cpu() {
 
                 if (elapsed >= ONE_SECOND_NS) {
                     start = end;
-//                    if (!page->used)
-//                        page->used = 1;
 
-//                    process_log(kernel->scheduler.scheduled_proc->name,
-//                                kernel->scheduler.scheduled_proc->remaining,
-//                                pc,
-//                                seg->id,
-//                                kernel->scheduler.scheduled_proc->o_files->size);
-//                    sem_post(&log_mutex);
-//                    sem_post(&refresh_sem);
+                    // kernel->seg_table.segmentos[buscaSegmento(kernel->scheduler.scheduled->processo->idSegmento)].used = 1;
 
                     avalia(kernel->scheduler.scheduled->processo);
                 }

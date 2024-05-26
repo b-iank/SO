@@ -184,7 +184,7 @@ void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *));
 // ------------------------------------- FUNÇÕES PROCESSO --------------------------------------
 PCB iniciaPCB();
 PCB add_process(PROCESSO *processo);
-void readSyntheticProgram(FILE *, PROCESSO **, INSTRUCAO **);
+void readSyntheticProgram(FILE *, PROCESSO **);
 void processCreate(char *fileName);
 void processFinish(PROCESSO *processo);
 PROCESSO *buscaProcessoID(int id);
@@ -198,6 +198,7 @@ void memoriaLoadRequest(PROCESSO *processo);
 void trocaPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
 void freeSegmento(int idSegmento);
+int buscaSegmento(int idSegmento);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES SCHEDULER --------------------------------------

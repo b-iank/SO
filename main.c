@@ -4,26 +4,17 @@
 
 #include "so/so.h"
 
-clock_t inicio;
-
 KERNEL *kernel;
 
 void tela();
 
 int main() {
-    inicio = clock();
-
-    // process_log_init();
-    // memory_log_init();
-
     kernel = iniciaKernel();
 
-    cpu_init();
+    processCreate("synt2");
+    //cpu_init();
 
-    pthread_t menu;
-
-    pthread_create(&menu, NULL, (void*) tela, NULL);
-
+    //tela();
     return 0;
 }
 
