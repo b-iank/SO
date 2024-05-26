@@ -55,7 +55,8 @@
 #define SEMAPHORE_BLOCKED 0x4
 
 #define ONE_SECOND_NS (1000000000L)
-#define FETCH_INSTR_ADDR(x) ((x)->pc++)
+#define MAX(a, b) ((a) >= (b) ? (a) : (b))
+#define MIN(a, b) ((a) >= (b) ? (b) : (a))
 
 typedef struct semaforo SEMAFORO;
 typedef struct tabela_semaforo TABELA_SEMAFORO;
@@ -96,7 +97,7 @@ struct processo {
     char semaforos[MAX_SEMAFOROS];
     int quantidadeSemaforos;
 
-    // Legado
+    // Tempo
     int id; // tempo maximo - (tempo atual - tempo chegada) -> 5000 - (1700 - 1500)
     int tempoMaximo;
     int tempoRestante;
@@ -168,6 +169,7 @@ struct kernel {
 };
 
 extern KERNEL *kernel;
+extern pthread_mutex_t criacao;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 TABELA_SEMAFORO iniciaTabelaSemaforo();

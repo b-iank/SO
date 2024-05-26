@@ -37,9 +37,9 @@ void tela() {
             processInterrupt();
             sysCall(PROCESS_CREATE, fileName);
         } else if (op == 2) {
-            // a
+            printaProcessos();
         } else if (op == 3) {
-            //
+            printaMemoria();
         } else {
             printf("Adeus Aleardo :D");
         }

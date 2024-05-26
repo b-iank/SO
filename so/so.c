@@ -271,6 +271,46 @@ PROCESSO *buscaProcessoID(int id) {
     erro(mensagem);
     exit(EXIT_FAILURE);
 }
+
+void avalia(PROCESSO *processo) {
+    INSTRUCAO *instr = &processo->codigo[processo->pc];
+    switch (instr->op) {
+        case EXEC: {
+            if (processo->tempoMaximo < instr->value)
+                processo->codigo->value = instr->value - processo->tempoMaximo;
+            else {
+                processo->tempoRestante = processo->tempoRestante - instr->value;
+                processo->pc++;
+            }
+            break;
+        }
+        case SEM_P: {
+            sysCall(SEMAPHORE_P, buscaSemaforo(instr->sem));
+
+            if (processo->estado != BLOQUEADO)
+                processo->tempoRestante = MAX(0, processo->tempoRestante - 200);
+            break;
+        }
+        case SEM_V: {
+            sysCall(SEMAPHORE_V, buscaSemaforo(instr->sem));
+            processo->tempoRestante = MAX(0, processo->tempoRestante - 200);
+            break;
+        }
+        case READ: {
+            // sysCall(DISK_READ_REQUEST, instr->value);
+            break;
+        }
+        case WRITE: {
+            // sysCall(DISK_WRITE_REQUEST, instr->value);
+            break;
+        }
+        case PRINT: {
+            // sysCall(PRINT_REQUEST, (void*) instr->value);
+            break;
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES INSTRUÇÃO -------------------------------------
@@ -514,6 +554,7 @@ void interruptControl(char function, void *arg) {
             processo->estado = PRONTO;
 
             add_process_scheduler(processo);
+            pthread_mutex_unlock(&criacao);
             break;
         }
         default: {
@@ -529,6 +570,8 @@ void interruptControl(char function, void *arg) {
 void cpu_init() {
     pthread_t cpu_id;
     pthread_attr_t cpu_attr;
+
+    pthread_mutex_init(&criacao, NULL);
 
     pthread_attr_init(&cpu_attr);
     pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
@@ -547,6 +590,7 @@ _Noreturn void cpu() {
 
     int no_process = 0;
     while (1) {
+        pthread_mutex_lock(&criacao);
         if (!kernel->scheduler.scheduled) {
             if (!no_process) {
                 //sem_post(&refresh_sem);
@@ -564,10 +608,6 @@ _Noreturn void cpu() {
 
                 if (elapsed >= ONE_SECOND_NS) {
                     start = end;
-
-                    const int pc
-                        = FETCH_INSTR_ADDR(kernel->scheduler.scheduled->processo);
-
 //                    if (!page->used)
 //                        page->used = 1;
 
@@ -595,6 +635,7 @@ _Noreturn void cpu() {
             else
                 sysCall(PROCESS_INTERRUPT, (void*)QUANTUM_COMPLETED);
         }
+        pthread_mutex_unlock(&criacao);
     }
 }
 
