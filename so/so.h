@@ -15,8 +15,8 @@
 #define QUANTUM_TIME 5000
 
 #define K 1024
-#define TAMANHO_PAGINA (8 * K)
-#define TAMANHO_MAX_MEMORIA K *K *K // 1 GB = 1 * 1024 * 1024 * 1024
+#define TAMANHO_PAGINA 8 // em bytes
+#define TAMANHO_MAX_MEMORIA (K * K * K) // 1 GB = 1 * 1024 * 1024 * 1024
 
 // FUNÇÕES DO KERNEL
 #define PROCESS_INTERRUPT '1'
@@ -105,7 +105,7 @@ struct processo {
     char estado;
     int pc;
     int numComandos;
-    INSTRUCAO* codigo;
+    INSTRUCAO *codigo;
 
     PROCESSO *prox; // Lista de processos
 };
@@ -204,7 +204,7 @@ int buscaSegmento(int idSegmento);
 // ------------------------------------- FUNÇÕES SCHEDULER --------------------------------------
 SCHEDULER iniciaScheduler();
 SCHEDULER add_process_scheduler(PROCESSO *processo);
-void schedule_process(int flag);
+SCHEDULER schedule_process(int flag);
 void removeScheduler(PROCESSO *processo);
 // ---------------------------------------------------------------------------------------------
 

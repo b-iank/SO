@@ -11,10 +11,10 @@ void tela();
 int main() {
     kernel = iniciaKernel();
 
-    processCreate("synt2");
+    //processCreate("synt2");
     //cpu_init();
 
-    //tela();
+    tela();
     return 0;
 }
 
@@ -25,12 +25,15 @@ void tela() {
         op = main_menu();
         if (op == 1) {
             scanf("%s", fileName);
-            sysCall(PROCESS_INTERRUPT, NONE);
             sysCall(PROCESS_CREATE, fileName);
         } else if (op == 2) {
             printaProcessos();
         } else if (op == 3) {
-            printaMemoria();
+            if (kernel->scheduler.scheduled == NULL)
+                schedule_process(NONE);
+            else
+                printf("%s %d\n", kernel->scheduler.scheduled->processo->nome, kernel->scheduler.scheduled->processo->id);
+            // printaMemoria();
         } else {
             printf("Adeus Aleardo :D");
         }
