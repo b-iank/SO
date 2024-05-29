@@ -151,7 +151,6 @@ struct scheduler {
     PROCESSO_SCHEDULER *head;
     PROCESSO_SCHEDULER *tail;
     PROCESSO_SCHEDULER *scheduled;
-    PROCESSO_SCHEDULER *bloqueados;
 };
 
 struct kernel {
