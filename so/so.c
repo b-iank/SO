@@ -601,7 +601,7 @@ KERNEL *iniciaKernel() {
 
     kernel->pcb = iniciaPCB();
     kernel->proxId = 1; /* 0 is for the kernel */
-    kernel->pc = 0;
+    kernel->time = 0;
 
     kernel->seg_table = iniciaTabelaSegmentos();
 
