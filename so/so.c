@@ -118,7 +118,6 @@ void processCreate(char *fileName) {
     readSyntheticProgram(fp, &process);
 
     sysCall(MEMORY_LOAD_REQUEST, process);
-    sysCall(PROCESS_INTERRUPT, NONE);
 }
 
 PCB iniciaPCB() {
@@ -278,13 +277,10 @@ void processFinish(PROCESSO *processo) {
         PROCESSO *busca = kernel->pcb.head;
         while (busca->id != processo->id)
             busca = busca->prox;
-        if (kernel->scheduler.scheduled->processo->id == processo->id)
-            sysCall(PROCESS_INTERRUPT, NONE);
-
+        // if (kernel->scheduler.scheduled->processo->id == processo->id) TODO: nao precisa ne?
+        interruptControl(PROCESS_INTERRUPT, (void*) FINISHED);
         freeSegmento(processo->idSegmento);
         removeScheduler(processo);
-
-        processo->estado = CONCLUIDO;
 
         free(processo->codigo);
     }
@@ -309,7 +305,9 @@ void avalia(PROCESSO *processo) {
         case EXEC: {
             if (processo->tempoRestante < instr->value) {
                 instr->value = instr->value - processo->tempoRestante;
-                sysCall(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+                pthread_mutex_unlock(&mutexScheduler);
+                interruptControl(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+                pthread_mutex_lock(&mutexScheduler);
             } else {
                 processo->tempoRestante = processo->tempoRestante - instr->value;
                 processo->pc++;
@@ -327,16 +325,12 @@ void avalia(PROCESSO *processo) {
         }
         case SEM_V: {
             sysCall(SEMAPHORE_V, buscaSemaforo(instr->sem));
-            printf("%d - %d\n", processo->pc, processo->tempoRestante);
             processo->tempoRestante = MAX(0, processo->tempoRestante - 200);
             processo->pc++;
             break;
         }
         default:
             processo->pc++;
-    }
-    if (processo->pc > processo->numComandos) {
-        sysCall(PROCESS_FINISH, processo);
     }
 }
 
@@ -502,9 +496,9 @@ SCHEDULER add_process_scheduler(PROCESSO *processo) {
 }
 
 SCHEDULER schedule_process(int flag) {
-    pthread_mutex_lock(&mutexScheduler);
     SCHEDULER scheduler = kernel->scheduler;
     PROCESSO_SCHEDULER *atual = scheduler.scheduled, *novo = NULL;
+    int finished = 1;
 
     PROCESSO_SCHEDULER *aux = atual;
     if (aux) aux = aux->prox;
@@ -520,19 +514,27 @@ SCHEDULER schedule_process(int flag) {
         if (flag == IO_REQUESTED || flag == SEMAPHORE_BLOCKED) {
             atual->processo->estado = BLOQUEADO;
         } else if (flag == QUANTUM_COMPLETED) {
-            //printf("QUANTUM COMPLETED ");
+            // printf("QUANTUM COMPLETED ");
             atual->processo->estado = PRONTO;
+        }
+        else if (flag == FINISHED) {
+            printf("oi");
+            atual->processo->estado = CONCLUIDO;
+            if (novo == atual)
+                finished = 0;
         }
     } else if (scheduler.head) {
         novo = scheduler.head;
         novo->processo->tempoRestante = novo->processo->tempoMaximo;
     }
 
-    if (novo)
+    if (novo && novo != atual)
         novo->processo->estado = EXECUTANDO;
 
-    scheduler.scheduled = novo;
-    pthread_mutex_unlock(&mutexScheduler);
+    if (finished)
+        scheduler.scheduled = novo;
+    else
+        scheduler.scheduled = NULL;
     return scheduler;
 }
 
@@ -614,10 +616,6 @@ KERNEL *iniciaKernel() {
 
 void sysCall(char function, void *arg) {
     switch (function) {
-        case PROCESS_INTERRUPT: {
-            kernel->scheduler = schedule_process((int) arg);
-            break;
-        }
         case PROCESS_CREATE: {
             processCreate((char *) arg);
             break;
@@ -645,7 +643,7 @@ void sysCall(char function, void *arg) {
     }
 }
 
-static void sleep() { sysCall(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED); }
+static void sleep() { interruptControl(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED); }
 
 static void wakeup(PROCESSO *processo) {
     if (processo->pc < processo->numComandos)
@@ -656,15 +654,25 @@ static void wakeup(PROCESSO *processo) {
 
 void interruptControl(char function, void *arg) {
     switch (function) {
+        case PROCESS_INTERRUPT: {
+            pthread_mutex_lock(&mutexScheduler);
+            kernel->scheduler = schedule_process((int) arg);
+            pthread_mutex_unlock(&mutexScheduler);
+            break;
+        }
         case MEMORY_LOAD_FINISH: {
             PROCESSO *processo = (PROCESSO *) arg;
+
+            pthread_mutex_lock(&mutexScheduler);
 
             kernel->pcb = add_process(processo); // Adiciona o processo na PCB
             processo->estado = PRONTO;
 
-            pthread_mutex_lock(&mutexScheduler);
             kernel->scheduler = add_process_scheduler(processo);
+
             pthread_mutex_unlock(&mutexScheduler);
+
+            interruptControl(PROCESS_INTERRUPT, NONE);
             break;
         }
         default: {
@@ -676,7 +684,7 @@ void interruptControl(char function, void *arg) {
 }
 // ---------------------------------------------------------------------------------------------
 
-// ------------------------------------- FUNÇÕES CPU -------------------------------------------
+// ------------------------------------- FUNÇÕES CPU ------------------------------------------- AJR - may be man
 void cpu_init() {
     pthread_t cpu_id;
     pthread_attr_t cpu_attr;
@@ -703,9 +711,8 @@ _Noreturn void cpu() {
             continue;
         }
         else if (!kernel->scheduler.scheduled) {
-            sysCall(PROCESS_INTERRUPT, NONE);
+            interruptControl(PROCESS_INTERRUPT, NONE);
         } else {
-
             do {
                 clock_gettime(CLOCK_REALTIME, &end);
                 const int elapsed = (end.tv_sec - start.tv_sec) * ONE_SECOND_NS + (end.tv_nsec - start.tv_nsec);
@@ -715,8 +722,9 @@ _Noreturn void cpu() {
 
                     // kernel->seg_table.segmentos[buscaSegmento(kernel->scheduler.scheduled->processo->idSegmento)].used
                     // = 1;
-
+                    pthread_mutex_lock(&mutexScheduler);
                     avalia(kernel->scheduler.scheduled->processo);
+                    pthread_mutex_unlock(&mutexScheduler);
                 }
             } while (kernel->scheduler.scheduled != NULL && kernel->scheduler.scheduled->processo->tempoRestante > 0 &&
                      kernel->scheduler.scheduled->processo->pc < kernel->scheduler.scheduled->processo->numComandos);
@@ -724,8 +732,9 @@ _Noreturn void cpu() {
             if (kernel->scheduler.scheduled == NULL)
                 continue;
 
-            if (kernel->scheduler.scheduled->processo->pc > kernel->scheduler.scheduled->processo->numComandos)
+            if (kernel->scheduler.scheduled->processo->pc >= kernel->scheduler.scheduled->processo->numComandos) {
                 sysCall(PROCESS_FINISH, kernel->scheduler.scheduled);
+            }
             else
                 sysCall(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
         }

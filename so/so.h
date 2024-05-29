@@ -53,6 +53,7 @@
 #define IO_REQUESTED 0x1
 #define QUANTUM_COMPLETED 0x2
 #define SEMAPHORE_BLOCKED 0x4
+#define FINISHED 0x6
 
 #define ONE_SECOND_NS (1000000000L)
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
