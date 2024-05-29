@@ -2,9 +2,7 @@
 
 #include <math.h>
 
-int ID_SEGMENTOS = 0;
-
-pthread_mutex_t criacao;
+pthread_mutex_t mutexScheduler;
 
 static void sleep();
 
@@ -34,6 +32,7 @@ void novoSemaforo(char nome) {
     semaforo->nome = nome;
     semaforo->S = 1;
     semaforo->aguardando = 0;
+    semaforo->idAguardando = NULL;
     sem_init(&semaforo->mutex, 0, 1);
 
     if (!adicionaTabelaSemaforo(semaforo)) {
@@ -53,11 +52,11 @@ int adicionaTabelaSemaforo(SEMAFORO *semaforo) { // TODO: realocar
 }
 
 SEMAFORO *buscaSemaforo(char semaforo) {
-    TABELA_SEMAFORO tabela = kernel->tabelaSemaforo;
+    TABELA_SEMAFORO *tabela = &kernel->tabelaSemaforo;
     SEMAFORO *retorno = NULL;
-    for (int i = 0; i < MAX_SEMAFOROS && !retorno; i++) {
-        if (tabela.semaforo[i].nome == semaforo)
-            retorno = &tabela.semaforo[i];
+    for (int i = 0; i < tabela->quantidadeSemaforos && !retorno; i++) {
+        if (tabela->semaforo[i].nome == semaforo)
+            retorno = &tabela->semaforo[i];
     }
 
     return retorno;
@@ -76,12 +75,14 @@ void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void)) {
     sem_wait(&semaforo->mutex);
     semaforo->S--;
     if (semaforo->S < 0) {
-        semaforo->idAguardando = realloc(semaforo->idAguardando, ++semaforo->aguardando * sizeof(int));
+        semaforo->idAguardando = realloc(semaforo->idAguardando, (semaforo->aguardando++ * sizeof(int)));
+
         if (!semaforo->idAguardando) {
             erro("Sem memoria");
             exit(EXIT_FAILURE);
         }
-        semaforo->idAguardando[semaforo->aguardando - 1] = processo->id;
+
+        semaforo->idAguardando[semaforo->aguardando-1] = processo->id;
         sleep();
     }
     sem_post(&semaforo->mutex);
@@ -156,7 +157,7 @@ PCB add_process(PROCESSO *processo) {
     return lista_aux;
 }
 
-int findnum_lines(FILE* fp){
+int findnum_lines(FILE *fp) {
 
     int num_lines = 0;
     int line; // changed char to int
@@ -164,9 +165,9 @@ int findnum_lines(FILE* fp){
 
     size = ftell(fp);
     line = getc(fp);
-    if(size != 0){
-        while(line != EOF){
-            if(line == '\n'){
+    if (size != 0) {
+        while (line != EOF) {
+            if (line == '\n') {
                 num_lines = num_lines + 1;
             }
             line = getc(fp);
@@ -283,8 +284,9 @@ void processFinish(PROCESSO *processo) {
         freeSegmento(processo->idSegmento);
         removeScheduler(processo);
 
+        processo->estado = CONCLUIDO;
+
         free(processo->codigo);
-        free(processo);
     }
 }
 
@@ -302,14 +304,17 @@ PROCESSO *buscaProcessoID(int id) {
 
 void avalia(PROCESSO *processo) {
     INSTRUCAO *instr = &processo->codigo[processo->pc];
+    printf("%d ", processo->pc);
     switch (instr->op) {
         case EXEC: {
-            if (processo->tempoMaximo < instr->value)
-                processo->codigo->value = instr->value - processo->tempoMaximo;
-            else {
+            if (processo->tempoRestante < instr->value) {
+                instr->value = instr->value - processo->tempoRestante;
+                sysCall(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+            } else {
                 processo->tempoRestante = processo->tempoRestante - instr->value;
                 processo->pc++;
             }
+            // printf("%d %d %d %d %d\n", processo->tempoRestante, processo->codigo->value, instr);
             break;
         }
         case SEM_P: {
@@ -317,13 +322,21 @@ void avalia(PROCESSO *processo) {
 
             if (processo->estado != BLOQUEADO)
                 processo->tempoRestante = MAX(0, processo->tempoRestante - 200);
+            processo->pc++;
             break;
         }
         case SEM_V: {
             sysCall(SEMAPHORE_V, buscaSemaforo(instr->sem));
+            printf("%d - %d\n", processo->pc, processo->tempoRestante);
             processo->tempoRestante = MAX(0, processo->tempoRestante - 200);
+            processo->pc++;
             break;
         }
+        default:
+            processo->pc++;
+    }
+    if (processo->pc > processo->numComandos) {
+        sysCall(PROCESS_FINISH, processo);
     }
 }
 
@@ -346,7 +359,7 @@ TABELA_SEGMENTO iniciaTabelaSegmentos() {
 MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo) {
     MEMORIA *memoria = malloc(sizeof(MEMORIA));
     if (!memoria) {
-        erro("Sem memoria.");
+        erro("Sem memoria");
         exit(EXIT_FAILURE);
     }
     memoria->process = processo;
@@ -413,14 +426,15 @@ void freeSegmento(int idSegmento) {
     int qtd = tabelaSegmento.quantSegmentos, indice = buscaSegmento(idSegmento);
 
     SEGMENTO segmento = tabelaSegmento.segmentos[indice];
-    tabelaSegmento.memoriaRestante = MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento.memoriaRestante + segmento.paginaQuantMemoria);
+    tabelaSegmento.memoriaRestante =
+            MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento.memoriaRestante + segmento.paginaQuantMemoria);
 
-    for (; indice < qtd-1; indice++)
-        tabelaSegmento.segmentos[indice] = tabelaSegmento.segmentos[indice+1];
+    for (; indice < qtd - 1; indice++)
+        tabelaSegmento.segmentos[indice] = tabelaSegmento.segmentos[indice + 1];
 
     // Realoca a tabela de segmentos para quantidade - 1
-    tabelaSegmento.segmentos = (SEGMENTO *) realloc(tabelaSegmento.segmentos, sizeof(SEGMENTO) * (qtd-1));
-    if (!tabelaSegmento.segmentos) {
+    tabelaSegmento.segmentos = (SEGMENTO *) realloc(tabelaSegmento.segmentos, sizeof(SEGMENTO) * (qtd - 1));
+    if (!tabelaSegmento.segmentos && tabelaSegmento.segmentos != 0) {
         erro("Sem memoria");
         exit(EXIT_FAILURE);
     }
@@ -430,7 +444,8 @@ int buscaSegmento(int idSegmento) {
     TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
 
     int qtd = tabelaSegmento.quantSegmentos, indice;
-    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++);
+    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++)
+        ;
 
     return indice;
 }
@@ -451,7 +466,7 @@ SCHEDULER add_process_scheduler(PROCESSO *processo) {
     SCHEDULER scheduler = kernel->scheduler;
     PROCESSO_SCHEDULER *head = scheduler.head, *anterior = scheduler.tail;
 
-    PROCESSO_SCHEDULER *novo = malloc(sizeof (PROCESSO_SCHEDULER));
+    PROCESSO_SCHEDULER *novo = malloc(sizeof(PROCESSO_SCHEDULER));
     if (!novo) {
         erro("Sem memoria");
         exit(EXIT_FAILURE);
@@ -487,14 +502,16 @@ SCHEDULER add_process_scheduler(PROCESSO *processo) {
 }
 
 SCHEDULER schedule_process(int flag) {
+    pthread_mutex_lock(&mutexScheduler);
     SCHEDULER scheduler = kernel->scheduler;
     PROCESSO_SCHEDULER *atual = scheduler.scheduled, *novo = NULL;
 
     PROCESSO_SCHEDULER *aux = atual;
-    while (aux && aux->prox->processo->estado == BLOQUEADO && aux->prox != atual)
+    if (aux) aux = aux->prox;
+    while (aux && aux->processo->estado == BLOQUEADO && aux->prox != atual)
         aux = aux->prox;
 
-    if (aux && aux->prox != atual) {
+    if (aux && aux->processo->estado != BLOQUEADO) {
         novo = aux->prox;
         novo->processo->tempoRestante = novo->processo->tempoMaximo;
     }
@@ -503,10 +520,10 @@ SCHEDULER schedule_process(int flag) {
         if (flag == IO_REQUESTED || flag == SEMAPHORE_BLOCKED) {
             atual->processo->estado = BLOQUEADO;
         } else if (flag == QUANTUM_COMPLETED) {
+            //printf("QUANTUM COMPLETED ");
             atual->processo->estado = PRONTO;
         }
-    }
-    else {
+    } else if (scheduler.head) {
         novo = scheduler.head;
         novo->processo->tempoRestante = novo->processo->tempoMaximo;
     }
@@ -515,17 +532,21 @@ SCHEDULER schedule_process(int flag) {
         novo->processo->estado = EXECUTANDO;
 
     scheduler.scheduled = novo;
+    pthread_mutex_unlock(&mutexScheduler);
     return scheduler;
 }
 
 void removeScheduler(PROCESSO *processo) {
-    SCHEDULER scheduler = kernel->scheduler;
-    PROCESSO_SCHEDULER *removido = scheduler.head, *prev = scheduler.tail;
+    SCHEDULER *scheduler = &kernel->scheduler;
+    PROCESSO_SCHEDULER *removido = scheduler->head, *prev = scheduler->tail;
     while (removido->processo->id != processo->id) {
         prev = prev->prox;
         removido = removido->prox;
     }
-    prev->prox = removido->prox;
+    if (prev == removido)
+            scheduler->head = scheduler->tail = NULL;
+    else
+        prev->prox = removido->prox;
     free(removido);
 }
 // ---------------------------------------------------------------------------------------------
@@ -552,7 +573,7 @@ void printaProcessos() {
 void printaMemoria() {
     TABELA_SEGMENTO table = kernel->seg_table;
 
-    if (table.quantSegmentos > 0){
+    if (table.quantSegmentos > 0) {
         printf("┌───────────────────────────┐\n");
         printf("│%-27s│\n", "SEGMENTOS");
         printf("└───────────────────────────┘\n");
@@ -594,7 +615,6 @@ KERNEL *iniciaKernel() {
 void sysCall(char function, void *arg) {
     switch (function) {
         case PROCESS_INTERRUPT: {
-            pthread_mutex_lock(&criacao);
             kernel->scheduler = schedule_process((int) arg);
             break;
         }
@@ -612,7 +632,7 @@ void sysCall(char function, void *arg) {
             break;
         }
         case SEMAPHORE_P: {
-            P((SEMAFORO *) arg, kernel->pcb.atual, sleep);
+            P((SEMAFORO *) arg, kernel->scheduler.scheduled->processo, sleep);
             break;
         }
         case SEMAPHORE_V: {
@@ -625,10 +645,13 @@ void sysCall(char function, void *arg) {
     }
 }
 
-static void sleep() { sysCall(PROCESS_INTERRUPT, (void*)SEMAPHORE_BLOCKED); }
+static void sleep() { sysCall(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED); }
 
 static void wakeup(PROCESSO *processo) {
-    processo->estado = PRONTO;
+    if (processo->pc < processo->numComandos)
+        processo->estado = PRONTO;
+    else
+        processo->estado = CONCLUIDO;
 }
 
 void interruptControl(char function, void *arg) {
@@ -639,8 +662,9 @@ void interruptControl(char function, void *arg) {
             kernel->pcb = add_process(processo); // Adiciona o processo na PCB
             processo->estado = PRONTO;
 
+            pthread_mutex_lock(&mutexScheduler);
             kernel->scheduler = add_process_scheduler(processo);
-            pthread_mutex_unlock(&criacao);
+            pthread_mutex_unlock(&mutexScheduler);
             break;
         }
         default: {
@@ -657,12 +681,12 @@ void cpu_init() {
     pthread_t cpu_id;
     pthread_attr_t cpu_attr;
 
-    pthread_mutex_init(&criacao, NULL);
+    pthread_mutex_init(&mutexScheduler, NULL);
 
     pthread_attr_init(&cpu_attr);
     pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
 
-    pthread_create(&cpu_id, NULL, (void*)cpu, NULL);
+    pthread_create(&cpu_id, NULL, (void *) cpu, NULL);
 }
 
 _Noreturn void cpu() {
@@ -674,46 +698,37 @@ _Noreturn void cpu() {
 
     clock_gettime(CLOCK_REALTIME, &start);
 
-    int no_process = 0;
     while (1) {
-        pthread_mutex_lock(&criacao);
-        if (!kernel->scheduler.scheduled) {
-            if (!no_process) {
-                //sem_post(&refresh_sem);
-                no_process = 1;
-            }
-
-            kernel->scheduler = schedule_process(NONE);
+        if (!kernel->scheduler.head) {
+            continue;
         }
-        else {
-            no_process = 0;
+        else if (!kernel->scheduler.scheduled) {
+            sysCall(PROCESS_INTERRUPT, NONE);
+        } else {
+
             do {
                 clock_gettime(CLOCK_REALTIME, &end);
-                const int elapsed = (end.tv_sec - start.tv_sec) * ONE_SECOND_NS
-                                    + (end.tv_nsec - start.tv_nsec);
+                const int elapsed = (end.tv_sec - start.tv_sec) * ONE_SECOND_NS + (end.tv_nsec - start.tv_nsec);
 
                 if (elapsed >= ONE_SECOND_NS) {
                     start = end;
 
-                    // kernel->seg_table.segmentos[buscaSegmento(kernel->scheduler.scheduled->processo->idSegmento)].used = 1;
+                    // kernel->seg_table.segmentos[buscaSegmento(kernel->scheduler.scheduled->processo->idSegmento)].used
+                    // = 1;
 
                     avalia(kernel->scheduler.scheduled->processo);
                 }
-            } while (kernel->scheduler.scheduled != NULL
-                     && kernel->scheduler.scheduled->processo->tempoRestante > 0
-                     && kernel->scheduler.scheduled->processo->pc
-                            < kernel->scheduler.scheduled->processo->numComandos);
+            } while (kernel->scheduler.scheduled != NULL && kernel->scheduler.scheduled->processo->tempoRestante > 0 &&
+                     kernel->scheduler.scheduled->processo->pc < kernel->scheduler.scheduled->processo->numComandos);
 
             if (kernel->scheduler.scheduled == NULL)
                 continue;
 
-            if (kernel->scheduler.scheduled->processo->pc
-                > kernel->scheduler.scheduled->processo->numComandos)
-                sysCall(PROCESS_FINISH, kernel->scheduler.scheduled); // TODO: :3
+            if (kernel->scheduler.scheduled->processo->pc > kernel->scheduler.scheduled->processo->numComandos)
+                sysCall(PROCESS_FINISH, kernel->scheduler.scheduled);
             else
-                sysCall(PROCESS_INTERRUPT, (void*)QUANTUM_COMPLETED);
+                sysCall(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
         }
-        pthread_mutex_unlock(&criacao);
     }
 }
 

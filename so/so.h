@@ -165,11 +165,11 @@ struct kernel {
 
     SCHEDULER scheduler;
 
-    int pc; // <- Program Counter
+    int time; // <- TODO: contar o time
 };
 
 extern KERNEL *kernel;
-extern pthread_mutex_t criacao;
+extern pthread_mutex_t mutexScheduler;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 TABELA_SEMAFORO iniciaTabelaSemaforo();

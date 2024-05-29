@@ -1,6 +1,5 @@
 #include <pthread.h>
 #include <stdio.h>
-#include <time.h>
 
 #include "so/so.h"
 
@@ -12,13 +11,14 @@ int main() {
     kernel = iniciaKernel();
 
     //processCreate("synt2");
-    //cpu_init();
+    cpu_init();
 
     tela();
     return 0;
 }
 
 void tela() {
+    printaNome();
     int op;
     char fileName[255];
     do {

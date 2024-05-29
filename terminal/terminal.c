@@ -42,6 +42,22 @@ int main_menu() {
     return op;
 }
 
+void printaNome() {
+    printf(LARANJA NEGRITO"__________.__                           .__ \n");
+    printf("\\______   \\__|____    __________________|__|\n");
+    printf(" |    |  _/  \\__  \\  /    \\_  __ \\_  __ \\  |\n");
+    printf(" |    |   \\  |/ __ \\|   |  \\  | \\/|  | \\/  |\n");
+    printf(" |______  /__(____  /___|  /__|   |__|  |__|\n");
+    printf("        \\/        \\/     \\/                 \n\n" LIMPA);
+
+    printf(LARANJA NEGRITO "  _____                   .__                             \n");
+    printf("_/ ____\\_ ________________|__|____    ____   ____ _____   \n");
+    printf("\\   __\\  |  \\_  __ \\_  __ \\  \\__  \\  /    \\_/ ___\\\\__  \\  \n");
+    printf(" |  | |  |  /|  | \\/|  | \\/  |/ __ \\|   |  \\  \\___ / __ \\_\n");
+    printf(" |__| |____/ |__|   |__|  |__(____  /___|  /\\___  >____  /\n");
+    printf("                                  \\/     \\/     \\/     \\/ \n\n"LIMPA);
+}
+
 
 void printaProcesso(int id, char nome[50], char estado, int prioridade) {
     char estadoStr[11];
