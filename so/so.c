@@ -166,7 +166,7 @@ PROCESS * read_synthetic_program(FILE *fp) {
             break;
 
         if (process->qnt_semaphore == MAX_SEMAPHORE) {
-            so_alert("Numero maximo de semaphores alcancado.");
+            so_alert("Numero maximo de semaphores alcancado");
             continue;
         }
         if (semaphore_name == ' ')
@@ -204,8 +204,10 @@ PROCESS * read_synthetic_program(FILE *fp) {
         if (op[0] == 'P' || op[0] == 'V') {
             if (!semaphore_process_exists(op[2], process)) {
                 char error_msg[255];
-                sprintf(error_msg, "O semaphores %c nao existe.", op[2]);
+                sprintf(error_msg, "O semaphores %c nao existe", op[2]);
                 so_error(error_msg);
+                free(code);
+                free(process);
                 return NULL;
             }
             code[i].op = op[0] == 'P' ? SEM_P : SEM_V;
@@ -226,8 +228,10 @@ PROCESS * read_synthetic_program(FILE *fp) {
                 code[i].op = PRINT;
             else {
                 char error_msg[255];
-                sprintf(error_msg, "Operacao %s invalida.", left_op);
+                sprintf(error_msg, "Operacao %s invalida", left_op);
                 so_error(error_msg);
+                free(code);
+                free(process);
                 return NULL;
             }
             code[i].value = right_op;
@@ -667,7 +671,7 @@ void interrupt_control(char function, void *arg) {
         }
         default: {
             char error_msg[255];
-            sprintf(error_msg, "O process %c nao esta definido.", function);
+            sprintf(error_msg, "O process %c nao esta definido", function);
             so_alert(error_msg);
         }
     }
