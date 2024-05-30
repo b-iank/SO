@@ -4,19 +4,15 @@
 #define LIMPA "\x1B[0m"
 
 // ALERTAS
-#define ERRO "\x1b[38;5;1m"
-#define SUCESSO "\x1b[38;5;10m"
-#define ALERTA "\x1b[38;5;11m"
+#define ERROR "\x1b[38;5;1m"
+#define SUCESS "\x1b[38;5;10m"
+#define ALERT "\x1b[38;5;11m"
 
 // ESTILOS
-#define NEGRITO "\x1B[1m"
-#define ITALICO "\x1B[3m"
-#define SUBLINHADO "\x1B[4m"
-
-// FILME
-#define CIANO "\x1b[36m"
-#define LARANJA "\x1b[38;5;214m"
-#define ROXO "\x1b[38;5;126m"
+#define BOLD "\x1B[1m"
+#define ITALIC "\x1B[3m"
+#define UNDERLINE "\x1B[4m"
+#define ORANGE "\x1b[38;5;214m"
 
 #define CLEAR system("clear");
 
@@ -24,16 +20,16 @@ int main_menu() {
     int op = -1, ret;
 
     CLEAR
-    printf(LARANJA NEGRITO SUBLINHADO "\n------------ Zz SISTEMA OPERACIONAL zZ ------------\n" LIMPA);
+    printf(ORANGE BOLD UNDERLINE "\n------------ Zz SISTEMA OPERACIONAL zZ ------------\n" LIMPA);
     do {
-        printf("1 - Executar processo\n");
+        printf("1 - Adicionar processo\n");
         printf("2 - Ver processos\n");
         printf("3 - Ver memoria\n");
         printf("0 - Sair\n");
         ret = scanf("%d", &op);
 
         if (ret != 1 || op < 0 || op > 3) {
-            printf(ERRO NEGRITO "OPCAO INVALIDA!\n" LIMPA);
+            printf(ERROR BOLD "OPCAO INVALIDA!\n" LIMPA);
             while (getchar() != '\n')
                 ; // Limpa o buffer do teclado para evitar comportamentos inesperados
         }
@@ -42,46 +38,41 @@ int main_menu() {
     return op;
 }
 
-void printaNome() {
-    printf(LARANJA NEGRITO"__________.__                           .__ \n");
+void print_name() {
+    printf(ORANGE BOLD"\n\n__________.__                           .__ \n");
     printf("\\______   \\__|____    __________________|__|\n");
     printf(" |    |  _/  \\__  \\  /    \\_  __ \\_  __ \\  |\n");
     printf(" |    |   \\  |/ __ \\|   |  \\  | \\/|  | \\/  |\n");
     printf(" |______  /__(____  /___|  /__|   |__|  |__|\n");
     printf("        \\/        \\/     \\/                 \n\n" LIMPA);
 
-    printf(LARANJA NEGRITO "  _____                   .__                             \n");
-    printf("_/ ____\\_ ________________|__|____    ____   ____ _____   \n");
-    printf("\\   __\\  |  \\_  __ \\_  __ \\  \\__  \\  /    \\_/ ___\\\\__  \\  \n");
-    printf(" |  | |  |  /|  | \\/|  | \\/  |/ __ \\|   |  \\  \\___ / __ \\_\n");
-    printf(" |__| |____/ |__|   |__|  |__(____  /___|  /\\___  >____  /\n");
-    printf("                                  \\/     \\/     \\/     \\/ \n\n"LIMPA);
+
 }
 
 
-void printaProcesso(int id, char nome[50], char estado, int prioridade) {
-    char estadoStr[11];
-    if (estado == '0')
-        strcpy(estadoStr, "NOVO");
-    else if (estado == '1')
-        strcpy(estadoStr, "BLOQUEADO");
-    else if (estado == '2')
-        strcpy(estadoStr, "PRONTO");
-    else if (estado == '3')
-        strcpy(estadoStr, "EXECUTANDO");
-    else if (estado == '4')
-        strcpy(estadoStr, "CONCLUIDO");
-    printf("│%04d │ %-50s │ %-10s │ %02d│\n", id, nome, estadoStr, prioridade);
+void print_process(int id, char name[50], char state, int priority) {
+    char state_string[11];
+    if (state == '0')
+        strcpy(state_string, "NOVO");
+    else if (state == '1')
+        strcpy(state_string, "BLOQUEADO");
+    else if (state == '2')
+        strcpy(state_string, "PRONTO");
+    else if (state == '3')
+        strcpy(state_string, "EXECUTANDO");
+    else if (state == '4')
+        strcpy(state_string, "DONE");
+    printf("│ %04d │ %-50s │ %-10s │ %02d│\n", id, name, state_string, priority);
     printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
 }
 
-void printaSegmento(int id, int quantidade) {
-    printf("│%05d │ %05d      │\n", id, quantidade);
+void print_segment(int id, int pages) {
+    printf("│ %05d │ %05d      │\n", id, pages);
     printf("└───────────────────────────┘\n");
 }
 
-void sucesso(char *mensagem) { printf(SUCESSO "%s\n" LIMPA, mensagem); }
+void so_sucess(char *message) { printf(SUCESS "%s\n" LIMPA, message); }
 
-void alerta(char *mensagem) { printf(ALERTA "%s\n" LIMPA, mensagem); }
+void so_alert(char *message) { printf(ALERT "%s\n" LIMPA, message); }
 
-void erro(char *mensagem) { printf(ERRO NEGRITO "%s\n" LIMPA, mensagem); }
+void so_error(char *message) { printf(ERROR BOLD "%s\n" LIMPA, message); }

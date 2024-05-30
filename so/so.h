@@ -9,36 +9,30 @@
 
 #include "../terminal/terminal.h"
 
-#define MAX_SEMAFOROS 10
+#define MAX_SEMAPHORE 10
 
 #define MAX_PROCESS_NAME 50
 #define QUANTUM_TIME 5000
 
 #define K 1024
-#define TAMANHO_PAGINA 8 // em bytes
-#define TAMANHO_MAX_MEMORIA (K * K * K) // 1 GB = 1 * 1024 * 1024 * 1024
+#define MEMORY_PAGE_SIZE 8 // em bytes
+#define MAX_MEMORY_SIZE (K * K * K) // 1 GB = 1 * 1024 * 1024 * 1024
 
 // FUNÇÕES DO KERNEL
 #define PROCESS_INTERRUPT '1'
 #define PROCESS_CREATE '2'
 #define PROCESS_FINISH '3'
-#define DISK_REQUEST '4'
-#define DISK_FINISH '5'
 #define MEMORY_LOAD_REQUEST '6'
 #define MEMORY_LOAD_FINISH '7'
-#define FILE_SYSTEM_REQUEST '8'
-#define FILE_SYSTEM_FINISH '9'
 #define SEMAPHORE_P 'A' // 10
 #define SEMAPHORE_V 'B' // 11
-#define PRINT_REQUEST 'E' // 14
-#define PRINT_FINISH 'F' // 15
 
 // ESTADOS DO PROCESSO
-#define NOVO '0'
-#define BLOQUEADO '1'
-#define PRONTO '2'
-#define EXECUTANDO '3'
-#define CONCLUIDO '4'
+#define NEW '0'
+#define BLOCKED '1'
+#define READY '2'
+#define RUNNING '3'
+#define DONE '4'
 
 // INSTRUÇÃO
 #define EXEC '1'
@@ -50,7 +44,6 @@
 
 // SCHEDULER
 #define NONE 0x0
-#define IO_REQUESTED 0x1
 #define QUANTUM_COMPLETED 0x2
 #define SEMAPHORE_BLOCKED 0x4
 #define FINISHED 0x6
@@ -59,158 +52,153 @@
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
 #define MIN(a, b) ((a) >= (b) ? (b) : (a))
 
-typedef struct semaforo SEMAFORO;
-typedef struct tabela_semaforo TABELA_SEMAFORO;
+typedef struct semaphore SEMAPHORE;
+typedef struct semaphore_table SEMAPHORE_TABLE;
 
-typedef struct processo PROCESSO;
+typedef struct process PROCESS;
 typedef struct pcb PCB;
 
-typedef struct instrucao INSTRUCAO;
+typedef struct code CODE;
 
-typedef struct segmento SEGMENTO;
-typedef struct tabela_segmento TABELA_SEGMENTO;
+typedef struct segment SEGMENT;
+typedef struct segment_table SEGMENT_TABLE;
 
 typedef struct scheduler SCHEDULER;
-typedef struct processo_scheduler PROCESSO_SCHEDULER;
+typedef struct process_scheduler PROCESS_SCHEDULER;
 
 typedef struct kernel KERNEL;
 
-struct semaforo {
-    char nome;
+struct semaphore {
+    char name;
     int S;
-    int *idAguardando;
-    int aguardando;
+    int *id_blocked;
+    int qnt_blocked;
     sem_t mutex;
 };
 
-struct tabela_semaforo {
-    SEMAFORO semaforo[MAX_SEMAFOROS];
-    int quantidadeSemaforos;
+struct semaphore_table {
+    SEMAPHORE *semaphores;
+    int qnt_semaphore;
 };
 
-struct processo {
+struct process {
     // Cabecalho
-    char nome[MAX_PROCESS_NAME];
-    int idSegmento;
-    int prioridade;
-    int tamanhoSegmento;
-    char semaforos[MAX_SEMAFOROS];
-    int quantidadeSemaforos;
+    char name[MAX_PROCESS_NAME];
+    int segment_id;
+    int priority;
+    int segment_size;
+    char semaphore[MAX_SEMAPHORE];
+    int qnt_semaphore;
 
-    // Tempo
-    int id; // tempo maximo - (tempo atual - tempo chegada) -> 5000 - (1700 - 1500)
-    int tempoMaximo;
-    int tempoRestante;
+    int id;
+    int max_time;
+    int remaining_time;
 
-    char estado;
+    char state;
     int pc;
-    int numComandos;
-    INSTRUCAO *codigo;
+    int qnt_code;
+    CODE *code;
 
-    PROCESSO *prox; // Lista de processos
+    PROCESS *next; // Lista de processos (PCB)
 };
 
 struct pcb {
-    PROCESSO *head;
-    PROCESSO *tail;
-    PROCESSO *atual;
+    PROCESS *head;
+    PROCESS *tail;
 };
 
-struct instrucao {
+struct code {
     char op;
     int value;
     char sem;
 };
 
-struct segmento {
+struct segment {
     int id;
-    int paginaQuant;
-    int paginaQuantMemoria;
-    int segundaChance; // 0 -> 1; 1 sai da memoria
+    int qnt_page; // Quantidade de páginas do process
+    int qnt_page_memory; // Quantidade de págianas que estão na memória
+    int second_chance; // 1 -> 0 -> sai da memoria
 };
 
-struct tabela_segmento {
-    SEGMENTO *segmentos;
-    int quantSegmentos;
-    int memoriaRestante;
-    int atual;
+struct segment_table {
+    SEGMENT *segments;
+    int qnt_segments;
+    int remaining_memory;
+    int curr; // Indice do segmento atual no algoritmo de segunda chance
 };
 
-struct processo_scheduler {
-    PROCESSO *processo;
-    PROCESSO_SCHEDULER *prox;
+struct process_scheduler {
+    PROCESS *process;
+    PROCESS_SCHEDULER *next;
 };
 
 struct scheduler {
-    PROCESSO_SCHEDULER *head;
-    PROCESSO_SCHEDULER *tail;
-    PROCESSO_SCHEDULER *scheduled;
+    PROCESS_SCHEDULER *head;
+    PROCESS_SCHEDULER *tail;
+    PROCESS_SCHEDULER *scheduled;
 };
 
 struct kernel {
     PCB pcb; // <- Bloco de controle de processos
-    int proxId; // <- Guarda o próximo id de processo
-
-    /* Tabela de Segmentos */
-    TABELA_SEGMENTO seg_table;
-
-    /* Tabela de Semaforos */
-    TABELA_SEMAFORO tabelaSemaforo; // <- Guarda a tabela de semáforo
-
+    int next_id; // <- Guarda o próximo id de process
+    SEGMENT_TABLE segment_table; // <- Tabela de Segmentos
+    SEMAPHORE_TABLE semaphore_table; // <- Guarda a tabela de semáforo
     SCHEDULER scheduler;
-
     int time; // <- TODO: contar o time
 };
 
 extern KERNEL *kernel;
-extern pthread_mutex_t mutexScheduler;
+extern pthread_mutex_t mutex_scheduler;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
-TABELA_SEMAFORO iniciaTabelaSemaforo();
-void novoSemaforo(char nome);
-SEMAFORO *buscaSemaforo(char semaforo);
-int existeSemaforoProcesso(char semaforo, PROCESSO *process);
-int adicionaTabelaSemaforo(SEMAFORO *semaforo);
-void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void));
-void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *));
+SEMAPHORE_TABLE semaphore_table_init();
+void new_semaphore(char name);
+SEMAPHORE *find_semaphore(char semaphore_name);
+int semaphore_process_exists(char semaphore_name, PROCESS *process);
+void add_semaphore_table(SEMAPHORE *semaphore);
+void P(SEMAPHORE *semaphore, PROCESS *process);
+void V(SEMAPHORE *semaphore);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES PROCESSO --------------------------------------
-PCB iniciaPCB();
-PCB add_process(PROCESSO *processo);
-void readSyntheticProgram(FILE *, PROCESSO **);
-void processCreate(char *fileName);
-void processFinish(PROCESSO *processo);
-PROCESSO *buscaProcessoID(int id);
-void avalia(PROCESSO *processo);
+PCB PCB_init();
+void process_create(char *file_name);
+PCB add_process(PROCESS *process);
+PROCESS * read_synthetic_program(FILE *fp);
+int count_codes(FILE *fp);
+void process_finish(PROCESS *process);
+PROCESS *find_process(int id);
+void run_process(PROCESS *process);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
-TABELA_SEGMENTO iniciaTabelaSegmentos();
-void carregaPaginasMemoria(SEGMENTO *segmento, int requisicao);
-void memoriaLoadRequest(PROCESSO *processo);
-void trocaPaginas(int requisicao);
-void adicionaTabelaSegmentos(SEGMENTO *segmento);
-void freeSegmento(int idSegmento, int idProcesso);
-int buscaSegmento(int idSegmento);
+SEGMENT_TABLE segment_table_init();
+void load_memory_page(SEGMENT *segment, int request);
+void load_memory_request(PROCESS *process);
+void page_swap(int request);
+void add_segment_table(SEGMENT *segment);
+void segment_free(int segment_id, int process_id);
+int find_segment(int segment_id);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES SCHEDULER --------------------------------------
-SCHEDULER iniciaScheduler();
-SCHEDULER add_process_scheduler(PROCESSO *processo);
+SCHEDULER scheduler_init();
+SCHEDULER add_process_scheduler(PROCESS *process);
 SCHEDULER schedule_process(int flag);
-void removeScheduler(PROCESSO *processo);
+void remove_scheduler(PROCESS *process);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES LOG -------------------------------------------
-void printaProcessos();
-void printaMemoria();
+void print_pcb_processes();
+void print_segment_table();
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
-KERNEL *iniciaKernel();
-void sysCall(char function, void *arg);
-void interruptControl(char function, void *arg);
+KERNEL *kernel_init();
+void sys_call(char function, void *arg);
+void interrupt_control(char function, void *arg);
+void process_sleep();
+void process_wakeup(PROCESS *process);
 // ---------------------------------------------------------------------------------------------
 
 // ----------------------------------- FUNÇÕES CPU --------------------------------------------

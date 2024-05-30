@@ -1,5 +1,5 @@
-#include <pthread.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "so/so.h"
 
@@ -8,9 +8,10 @@ KERNEL *kernel;
 void tela();
 
 int main() {
-    kernel = iniciaKernel();
+    print_name();
+    sleep(5);
 
-    //processCreate("synt2");
+    kernel = kernel_init();
     cpu_init();
 
     tela();
@@ -18,20 +19,19 @@ int main() {
 }
 
 void tela() {
-    printaNome();
     int op;
-    char fileName[255];
+    char file_name[255];
     do {
         op = main_menu();
         if (op == 1) {
-            scanf("%s", fileName);
-            sysCall(PROCESS_CREATE, fileName);
-        } else if (op == 2) {
-            printaProcessos();
-        } else if (op == 3) {
-            printaMemoria();
-        } else {
+            printf("Digite o nome do arquivo: ");
+            scanf("%s", file_name);
+            sys_call(PROCESS_CREATE, file_name);
+        } else if (op == 2)
+            print_pcb_processes();
+        else if (op == 3)
+            print_segment_table();
+        else
             printf("Adeus Aleardo :D");
-        }
     } while (op != 0);
 }
