@@ -28,8 +28,10 @@ void tela() {
             scanf("%s", file_name);
             sys_call(PROCESS_CREATE, file_name);
         } else if (op == 2)
-            print_pcb_processes();
+            print_running_process();
         else if (op == 3)
+            print_pcb_processes();
+        else if (op == 4)
             print_segment_table();
         else
             printf("Adeus Aleardo :D");

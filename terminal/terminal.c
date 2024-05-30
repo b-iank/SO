@@ -1,21 +1,5 @@
 #include "terminal.h"
 
-// RESETA COR DO TERMINAL
-#define LIMPA "\x1B[0m"
-
-// ALERTAS
-#define ERROR "\x1b[38;5;1m"
-#define SUCESS "\x1b[38;5;10m"
-#define ALERT "\x1b[38;5;11m"
-
-// ESTILOS
-#define BOLD "\x1B[1m"
-#define ITALIC "\x1B[3m"
-#define UNDERLINE "\x1B[4m"
-#define ORANGE "\x1b[38;5;214m"
-
-#define CLEAR system("clear");
-
 int main_menu() {
     int op = -1, ret;
 
@@ -23,8 +7,9 @@ int main_menu() {
     printf(ORANGE BOLD UNDERLINE "\n------------ Zz SISTEMA OPERACIONAL zZ ------------\n" LIMPA);
     do {
         printf("1 - Adicionar processo\n");
-        printf("2 - Ver processos\n");
-        printf("3 - Ver memoria\n");
+        printf("2 - Ver processos em execucao\n");
+        printf("3 - Ver estado dos processos\n");
+        printf("4 - Ver memoria\n");
         printf("0 - Sair\n");
         printf("\nOpcao: ");
         ret = scanf("%d", &op);
@@ -34,7 +19,7 @@ int main_menu() {
             while (getchar() != '\n')
                 ; // Limpa o buffer do teclado para evitar comportamentos inesperados
         }
-    } while (ret != 1 || op < 0 || op > 3);
+    } while (ret != 1 || op < 0 || op > 4);
 
     return op;
 }

@@ -5,6 +5,8 @@
 pthread_mutex_t mutex_scheduler;
 pthread_mutex_t mutex_memory;
 
+int print = 0;
+
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 SEMAPHORE_TABLE semaphore_table_init() {
     SEMAPHORE_TABLE semaphore_table;
@@ -306,7 +308,8 @@ void run_process(PROCESS *process) {
     pthread_mutex_unlock(&mutex_memory);
 
     CODE *code = &process->code[process->pc];
-    printf("%s - %d\n", process->name, process->pc);
+    if (print)
+        print_code(process->name, code->op);
     switch (code->op) {
         case EXEC: {
             if (process->remaining_time < code->value) {
@@ -562,6 +565,7 @@ void remove_scheduler(PROCESS *process) {
 void print_pcb_processes() {
     PCB pcb = kernel->pcb;
     PROCESS *process = pcb.head;
+    CLEAR;
     if (process) {
         printf("┌───────────────────────────────────────────────────────────────────────────────────┐\n");
         printf("│ %-5s │ %-50s │ %-10s │ %-10s │\n", "ID", "Nome", "Estado", "Prioridade");
@@ -581,9 +585,46 @@ void print_pcb_processes() {
     while (!getchar());
 }
 
+void print_running_process() {
+    char next;
+    printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+    if (kernel->scheduler.scheduled) {
+        printf("\n┌────────────────────────┐\n");
+        printf("│ %-10s │ %-8s │\n", "Nome", "Operacao");
+        printf("└────────────────────────┘\n");
+        print = 1;
+    } else {
+        so_alert("┌─────────────────────────────────────────────┐");
+        so_alert("│ NAO EXISTE PROCESSOS EM EXECUCAO NO MOMENTO │");
+        so_alert("└─────────────────────────────────────────────┘");
+    }
+
+    scanf("%c", &next);
+    while (!getchar());
+    print = 0;
+}
+
+void print_code(char name[50], char op) {
+    char op_str[10];
+    if (op == EXEC)
+        strcpy(op_str, "EXEC");
+    else if (op == WRITE)
+        strcpy(op_str, "WRITE");
+    else if (op == READ)
+        strcpy(op_str, "READ");
+    else if (op == SEM_P)
+        strcpy(op_str, "SEM P");
+    else if (op == SEM_V)
+        strcpy(op_str, "SEM V");
+    else if (op == PRINT)
+        strcpy(op_str, "PRINT");
+    printf("│ %-10s │ %-8s │\n", name, op_str);
+}
+
 void print_segment_table() {
     SEGMENT_TABLE table = kernel->segment_table;
 
+    CLEAR;
     if (table.qnt_segments > 0) {
         printf("┌─────────────────────────────┐\n");
         printf("│ %-27s │\n", "SEGMENTOS");

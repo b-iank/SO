@@ -9,6 +9,8 @@
 
 #include "../terminal/terminal.h"
 
+#define CLEAR system("clear");
+
 #define MAX_SEMAPHORE 10
 
 #define MAX_PROCESS_NAME 50
@@ -190,6 +192,8 @@ void remove_scheduler(PROCESS *process);
 
 // ------------------------------------- FUNÇÕES LOG -------------------------------------------
 void print_pcb_processes();
+void print_running_process();
+void print_code(char name[50], char op);
 void print_segment_table();
 // ---------------------------------------------------------------------------------------------
 
