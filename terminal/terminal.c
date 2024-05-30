@@ -26,6 +26,7 @@ int main_menu() {
         printf("2 - Ver processos\n");
         printf("3 - Ver memoria\n");
         printf("0 - Sair\n");
+        printf("\nOpcao: ");
         ret = scanf("%d", &op);
 
         if (ret != 1 || op < 0 || op > 3) {

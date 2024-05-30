@@ -150,10 +150,13 @@ PROCESS * read_synthetic_program(FILE *fp) {
 
     process = malloc(sizeof(PROCESS));
 
+    char name[255];
+
     // Le cabecalho
-    fscanf(fp, "%s %d %d %d\n", process->name, &process->segment_id, &process->priority,
+    fscanf(fp, "%s %d %d %d\n", name, &process->segment_id, &process->priority,
            &process->segment_size);
 
+    strcpy(process->name, name);
     process->id = kernel->next_id++; // Pega o próximo id de process e soma a variável
     process->pc = 0;
     process->state = NEW;
@@ -204,7 +207,7 @@ PROCESS * read_synthetic_program(FILE *fp) {
         if (op[0] == 'P' || op[0] == 'V') {
             if (!semaphore_process_exists(op[2], process)) {
                 char error_msg[255];
-                sprintf(error_msg, "O semaphores %c nao existe", op[2]);
+                sprintf(error_msg, "O semaphores %c nao existe - Processo %s nao criado", op[2], name);
                 so_error(error_msg);
                 free(code);
                 free(process);
@@ -228,7 +231,7 @@ PROCESS * read_synthetic_program(FILE *fp) {
                 code[i].op = PRINT;
             else {
                 char error_msg[255];
-                sprintf(error_msg, "Operacao %s invalida", left_op);
+                sprintf(error_msg, "Operacao %s invalida - Processo %s nao criado", left_op, name);
                 so_error(error_msg);
                 free(code);
                 free(process);
