@@ -193,11 +193,10 @@ void avalia(PROCESSO *processo);
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
 TABELA_SEGMENTO iniciaTabelaSegmentos();
-MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo);
 void memoriaLoadRequest(PROCESSO *processo);
 void trocaPaginas(SEGMENTO *segmento, int requisicao);
 void adicionaTabelaSegmentos(SEGMENTO *segmento);
-void freeSegmento(int idSegmento);
+void freeSegmento(int idSegmento, int idProcesso);
 int buscaSegmento(int idSegmento);
 // ---------------------------------------------------------------------------------------------
 

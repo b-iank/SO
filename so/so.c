@@ -277,7 +277,7 @@ void processFinish(PROCESSO *processo) {
         pthread_mutex_lock(&mutexScheduler);
         interruptControl(PROCESS_INTERRUPT, (void*) FINISHED);
 
-        freeSegmento(processo->idSegmento);
+        freeSegmento(processo->idSegmento, processo->id);
         removeScheduler(processo);
         pthread_mutex_unlock(&mutexScheduler);
 
@@ -350,33 +350,25 @@ TABELA_SEGMENTO iniciaTabelaSegmentos() {
     return tabelaSegmento;
 }
 
-MEMORIA *memoriaRequest(PROCESSO *processo, INSTRUCAO *codigo) {
-    MEMORIA *memoria = malloc(sizeof(MEMORIA));
-    if (!memoria) {
-        erro("Sem memoria");
-        exit(EXIT_FAILURE);
-    }
-    memoria->process = processo;
-    memoria->code = codigo;
-    return memoria;
-}
-
 void memoriaLoadRequest(PROCESSO *processo) {
     TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
-    SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
 
-    segmento->id = processo->idSegmento;
+    if (buscaSegmento(processo->idSegmento) == -1) { // Segmento não existe -> cria
+        SEGMENTO *segmento = malloc(sizeof(SEGMENTO));
 
-    segmento->paginaQuant = (int) ceil((double) ((processo->tamanhoSegmento) / (TAMANHO_PAGINA)));
-    segmento->segundaChance = 1;
+        segmento->id = processo->idSegmento;
 
-    const int restante = tabelaSegmentos->memoriaRestante - processo->tamanhoSegmento;
+        segmento->paginaQuant = (int) ceil((double) ((double) (processo->tamanhoSegmento) / (TAMANHO_PAGINA)));
+        segmento->segundaChance = 1;
 
-    if (restante < 0)
-        trocaPaginas(segmento, restante);
-    else {
-        tabelaSegmentos->memoriaRestante = restante;
-        adicionaTabelaSegmentos(segmento);
+        const int restante = tabelaSegmentos->memoriaRestante - processo->tamanhoSegmento;
+
+        if (restante < 0)
+            trocaPaginas(segmento, restante);
+        else {
+            tabelaSegmentos->memoriaRestante = restante;
+            adicionaTabelaSegmentos(segmento);
+        }
     }
 }
 
@@ -449,7 +441,8 @@ int buscaSegmento(int idSegmento) {
     int qtd = tabelaSegmento.quantSegmentos, indice;
     for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++)
         ;
-
+    if (indice == qtd + 1)
+        return -1;
     return indice;
 }
 // ---------------------------------------------------------------------------------------------
