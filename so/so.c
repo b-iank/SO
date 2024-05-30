@@ -3,6 +3,8 @@
 #include <math.h>
 
 pthread_mutex_t mutexScheduler;
+pthread_mutex_t mutexMemoria;
+
 
 static void sleep();
 
@@ -158,7 +160,7 @@ PCB add_process(PROCESSO *processo) {
 int findnum_lines(FILE *fp) {
 
     int num_lines = 0;
-    int line; // changed char to int
+    int line;
     int size;
 
     size = ftell(fp);
@@ -298,6 +300,20 @@ PROCESSO *buscaProcessoID(int id) {
 }
 
 void avalia(PROCESSO *processo) {
+    pthread_mutex_lock(&mutexMemoria);
+    SEGMENTO *segmento = &kernel->seg_table.segmentos[buscaSegmento(processo->idSegmento)];
+    if (segmento->paginaQuantMemoria < segmento->paginaQuant) {
+        int requisicao = TAMANHO_PAGINA * (segmento->paginaQuant - segmento->paginaQuantMemoria); // em kbytes
+        int restante = (kernel->seg_table.memoriaRestante) - requisicao * K; // memoria restante em bytes
+
+        if (kernel->seg_table.memoriaRestante <= 0)
+            trocaPaginas(segmento->paginaQuant*TAMANHO_PAGINA); // em kbytes
+        else if (restante < 0)
+            trocaPaginas(segmento->paginaQuant*TAMANHO_PAGINA - kernel->seg_table.memoriaRestante/K);
+        carregaPaginasMemoria(segmento, requisicao);
+    }
+    pthread_mutex_unlock(&mutexMemoria);
+
     INSTRUCAO *instr = &processo->codigo[processo->pc];
     printf("%s - %d\n", processo->nome, processo->pc);
     switch (instr->op) {
@@ -341,12 +357,20 @@ TABELA_SEGMENTO iniciaTabelaSegmentos() {
     TABELA_SEGMENTO tabelaSegmento;
     tabelaSegmento.segmentos = NULL;
     tabelaSegmento.quantSegmentos = 0;
-    tabelaSegmento.memoriaRestante = 1073741824; // (1024^3);
+    tabelaSegmento.memoriaRestante = 1073741824; // (1024^3) em bytes. 1048576 KB. 1024 MB. 1 GB. A pagina é 8 KB.
 
     return tabelaSegmento;
 }
 
+void carregaPaginasMemoria(SEGMENTO *segmento, int requisicao) {
+    TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
+
+    tabelaSegmentos->memoriaRestante -= requisicao * K; // recebe em kbytes transforma pra bytes
+    segmento->paginaQuantMemoria = segmento->paginaQuant;
+}
+
 void memoriaLoadRequest(PROCESSO *processo) {
+    pthread_mutex_lock(&mutexMemoria);
     TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
 
     if (buscaSegmento(processo->idSegmento) == -1) { // Segmento não existe -> cria
@@ -354,38 +378,39 @@ void memoriaLoadRequest(PROCESSO *processo) {
 
         segmento->id = processo->idSegmento;
 
-        segmento->paginaQuant = (int) ceil((double) ((double) (processo->tamanhoSegmento) / (TAMANHO_PAGINA)));
-        segmento->paginaQuantMemoria = segmento->paginaQuant;
+        segmento->paginaQuant = (int) ceil((double) ((double) (processo->tamanhoSegmento) / (TAMANHO_PAGINA))); // tamanho em kbytes, pagina em kbytes
         segmento->segundaChance = 1;
 
-        const int restante = tabelaSegmentos->memoriaRestante - processo->tamanhoSegmento;
+        const int restante = tabelaSegmentos->memoriaRestante - processo->tamanhoSegmento*K; // memoria em bytes, tamanho em kbytes
 
-        if (restante < 0)
-            trocaPaginas(segmento, restante);
-        else {
-            tabelaSegmentos->memoriaRestante = restante;
-            adicionaTabelaSegmentos(segmento);
-        }
+        if (tabelaSegmentos->memoriaRestante <= 0)
+            trocaPaginas(segmento->paginaQuant*TAMANHO_PAGINA); // troca paginas recebe em kbytes
+        else if (restante < 0)
+            trocaPaginas(segmento->paginaQuant*TAMANHO_PAGINA - tabelaSegmentos->memoriaRestante/K); // tudo em kbytes
+        // TODO: testar esse else if
+        carregaPaginasMemoria(segmento, segmento->paginaQuant*TAMANHO_PAGINA); // em kbytes
+        adicionaTabelaSegmentos(segmento);
     }
+    pthread_mutex_unlock(&mutexMemoria);
 }
 
-void trocaPaginas(SEGMENTO *novoSegmento, int requisicao) {
-    requisicao = requisicao * -1;
+void trocaPaginas(int requisicao) {
     TABELA_SEGMENTO *tabelaSegmentos = &kernel->seg_table;
-    while (tabelaSegmentos->memoriaRestante < 0) {
-        SEGMENTO segmentoAtual = tabelaSegmentos->segmentos[tabelaSegmentos->atual];
-        if (segmentoAtual.segundaChance && segmentoAtual.paginaQuantMemoria > 0) {
-            segmentoAtual.segundaChance = 0;
+    SEGMENTO *segmentoAtual;
+    while (requisicao != 0) {
+        segmentoAtual = &tabelaSegmentos->segmentos[tabelaSegmentos->atual];
+        if (segmentoAtual->segundaChance && segmentoAtual->paginaQuantMemoria > 0) {
+            segmentoAtual->segundaChance = 0;
         } else {
-            while (tabelaSegmentos->memoriaRestante < requisicao && segmentoAtual.paginaQuantMemoria > 0) {
-                segmentoAtual.paginaQuantMemoria--;
-                tabelaSegmentos->memoriaRestante += 8 * K;
+            while (requisicao != 0 && segmentoAtual->paginaQuantMemoria > 0) {
+                segmentoAtual->paginaQuantMemoria--;
+                tabelaSegmentos->memoriaRestante += TAMANHO_PAGINA * K;
+                requisicao = MAX(0, requisicao - TAMANHO_PAGINA);
             }
-            segmentoAtual.segundaChance = 1;
+            segmentoAtual->segundaChance = 1;
         }
         tabelaSegmentos->atual = (tabelaSegmentos->atual + 1) % tabelaSegmentos->quantSegmentos;
     }
-    adicionaTabelaSegmentos(novoSegmento);
 }
 
 void adicionaTabelaSegmentos(SEGMENTO *segmento) {
@@ -422,7 +447,7 @@ void freeSegmento(int idSegmento, int idProcesso) {
 
         SEGMENTO segmento = tabelaSegmento->segmentos[indice];
         tabelaSegmento->memoriaRestante =
-                MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento->memoriaRestante - (segmento.paginaQuantMemoria * TAMANHO_PAGINA));
+                MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento->memoriaRestante + K*(segmento.paginaQuantMemoria * TAMANHO_PAGINA));
 
         for (; indice < qtd - 1; indice++)
             tabelaSegmento->segmentos[indice] = tabelaSegmento->segmentos[indice + 1];
@@ -683,6 +708,7 @@ void cpu_init() {
     pthread_attr_t cpu_attr;
 
     pthread_mutex_init(&mutexScheduler, NULL);
+    pthread_mutex_init(&mutexMemoria, NULL);
 
     pthread_attr_init(&cpu_attr);
     pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
