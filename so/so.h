@@ -67,7 +67,6 @@ typedef struct pcb PCB;
 
 typedef struct instrucao INSTRUCAO;
 
-typedef struct memoria MEMORIA;
 typedef struct segmento SEGMENTO;
 typedef struct tabela_segmento TABELA_SEGMENTO;
 
@@ -121,11 +120,6 @@ struct instrucao {
     char op;
     int value;
     char sem;
-};
-
-struct memoria {
-    PROCESSO *process;
-    INSTRUCAO *code;
 };
 
 struct segmento {

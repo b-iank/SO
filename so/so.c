@@ -73,10 +73,10 @@ int existeSemaforoProcesso(char semaforo, PROCESSO *process) {
 }
 
 void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void)) {
-    sem_wait(&semaforo->mutex);
+    // sem_wait(&semaforo->mutex);
     semaforo->S--;
     if (semaforo->S < 0) {
-        semaforo->idAguardando = (int*) realloc(semaforo->idAguardando, (++semaforo->aguardando * sizeof(int)));
+        semaforo->idAguardando = (int *) realloc(semaforo->idAguardando, (++semaforo->aguardando * sizeof(int)));
         if (!semaforo->idAguardando) {
             erro("Sem memoria");
             exit(EXIT_FAILURE);
@@ -84,11 +84,11 @@ void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void)) {
         semaforo->idAguardando[semaforo->aguardando - 1] = processo->id;
         sleep();
     }
-    sem_post(&semaforo->mutex);
+    // sem_post(&semaforo->mutex);
 }
 
 void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *)) {
-    sem_wait(&semaforo->mutex);
+    // sem_wait(&semaforo->mutex);
     semaforo->S++;
     if (semaforo->S <= 0 && semaforo->aguardando > 0) {
         semaforo->aguardando--;
@@ -100,7 +100,7 @@ void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *)) {
             return;
         wakeup(aguardando);
     }
-    sem_post(&semaforo->mutex);
+    // sem_post(&semaforo->mutex);
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -355,6 +355,7 @@ void memoriaLoadRequest(PROCESSO *processo) {
         segmento->id = processo->idSegmento;
 
         segmento->paginaQuant = (int) ceil((double) ((double) (processo->tamanhoSegmento) / (TAMANHO_PAGINA)));
+        segmento->paginaQuantMemoria = segmento->paginaQuant;
         segmento->segundaChance = 1;
 
         const int restante = tabelaSegmentos->memoriaRestante - processo->tamanhoSegmento;
@@ -403,21 +404,25 @@ void adicionaTabelaSegmentos(SEGMENTO *segmento) {
 
 void freeSegmento(int idSegmento, int idProcesso) {
     TABELA_SEGMENTO *tabelaSegmento = &kernel->seg_table;
-    tabelaSegmento->quantSegmentos--;
 
     int existe = 0;
     PROCESSO_SCHEDULER *busca = kernel->scheduler.head->prox, *head = kernel->scheduler.head;
+
+    if (head->processo->id != idProcesso && head->processo->idSegmento == idSegmento)
+        existe = 1;
     while (busca != head && !existe) {
         if (busca->processo->id != idProcesso && busca->processo->idSegmento == idSegmento)
             existe = 1;
+        busca = busca->prox;
     }
 
     if (!existe) { // Se existir outro processo que esteja utilizando do segmento ele não será removido
         int qtd = tabelaSegmento->quantSegmentos, indice = buscaSegmento(idSegmento);
+        tabelaSegmento->quantSegmentos--;
 
         SEGMENTO segmento = tabelaSegmento->segmentos[indice];
         tabelaSegmento->memoriaRestante =
-                MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento->memoriaRestante + segmento.paginaQuantMemoria);
+                MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento->memoriaRestante - (segmento.paginaQuantMemoria * TAMANHO_PAGINA));
 
         for (; indice < qtd - 1; indice++)
             tabelaSegmento->segmentos[indice] = tabelaSegmento->segmentos[indice + 1];
@@ -434,11 +439,13 @@ void freeSegmento(int idSegmento, int idProcesso) {
 int buscaSegmento(int idSegmento) {
     TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
 
-    int qtd = tabelaSegmento.quantSegmentos, indice;
-    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++);
-    if (indice == qtd + 1)
-        return -1;
-    return indice;
+    int qtd = tabelaSegmento.quantSegmentos;
+    for (int indice = 0; indice < qtd; indice++) {
+        if (tabelaSegmento.segmentos[indice].id == idSegmento)
+            return indice;
+    }
+
+    return -1;
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -536,6 +543,10 @@ void removeScheduler(PROCESSO *processo) {
         scheduler->head = scheduler->tail = NULL;
     else
         prev->prox = removido->prox;
+    if (removido == scheduler->head)
+        scheduler->head = removido->prox;
+    if (removido == scheduler->tail)
+        scheduler->tail = prev;
     free(removido);
 }
 // ---------------------------------------------------------------------------------------------

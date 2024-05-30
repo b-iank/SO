@@ -29,11 +29,7 @@ void tela() {
         } else if (op == 2) {
             printaProcessos();
         } else if (op == 3) {
-            if (kernel->scheduler.scheduled == NULL)
-                schedule_process(NONE);
-            else
-                printf("%s %d\n", kernel->scheduler.scheduled->processo->nome, kernel->scheduler.scheduled->processo->id);
-            // printaMemoria();
+            printaMemoria();
         } else {
             printf("Adeus Aleardo :D");
         }
