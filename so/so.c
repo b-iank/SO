@@ -76,13 +76,11 @@ void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void)) {
     sem_wait(&semaforo->mutex);
     semaforo->S--;
     if (semaforo->S < 0) {
-        semaforo->idAguardando = realloc(semaforo->idAguardando, (semaforo->aguardando++ * sizeof(int)));
-
+        semaforo->idAguardando = (int*) realloc(semaforo->idAguardando, (++semaforo->aguardando * sizeof(int)));
         if (!semaforo->idAguardando) {
             erro("Sem memoria");
             exit(EXIT_FAILURE);
         }
-
         semaforo->idAguardando[semaforo->aguardando - 1] = processo->id;
         sleep();
     }
@@ -287,20 +285,21 @@ void processFinish(PROCESSO *processo) {
 }
 
 PROCESSO *buscaProcessoID(int id) {
-    PROCESSO *busca = kernel->pcb.head;
-    while (busca) {
-        if (busca->id == id)
-            return busca;
+    PROCESSO_SCHEDULER *busca = kernel->scheduler.head->prox, *head = kernel->scheduler.head;
+    if (head->processo->id == id)
+        return head->processo;
+
+    while (busca != head) {
+        if (busca->processo->id == id)
+            return busca->processo;
+        busca = busca->prox;
     }
-    char mensagem[255];
-    sprintf(mensagem, "Processo %d nao encontrado", id);
-    erro(mensagem);
     return NULL;
 }
 
 void avalia(PROCESSO *processo) {
     INSTRUCAO *instr = &processo->codigo[processo->pc];
-    printf("%d ", processo->pc);
+    printf("%s - %d\n", processo->nome, processo->pc);
     switch (instr->op) {
         case EXEC: {
             if (processo->tempoRestante < instr->value) {
