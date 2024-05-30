@@ -276,10 +276,10 @@ void processFinish(PROCESSO *processo) {
     if (processo) {
         pthread_mutex_lock(&mutexScheduler);
         interruptControl(PROCESS_INTERRUPT, (void*) FINISHED);
-        pthread_mutex_unlock(&mutexScheduler);
 
         freeSegmento(processo->idSegmento);
         removeScheduler(processo);
+        pthread_mutex_unlock(&mutexScheduler);
 
         free(processo->codigo);
     }
@@ -300,6 +300,9 @@ PROCESSO *buscaProcessoID(int id) {
 void avalia(PROCESSO *processo) {
     INSTRUCAO *instr = &processo->codigo[processo->pc];
     printf("%d ", processo->pc);
+    if (processo->pc == 5) {
+        printf("");
+    }
     switch (instr->op) {
         case EXEC: {
             if (processo->tempoRestante < instr->value) {
@@ -410,24 +413,33 @@ void adicionaTabelaSegmentos(SEGMENTO *segmento) {
     tabelaSegmentos->segmentos[i - 1] = *segmento;
 }
 
-void freeSegmento(int idSegmento) {
-    TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
-    tabelaSegmento.quantSegmentos--;
+void freeSegmento(int idSegmento, int idProcesso) {
+    TABELA_SEGMENTO *tabelaSegmento = &kernel->seg_table;
+    tabelaSegmento->quantSegmentos--;
 
-    int qtd = tabelaSegmento.quantSegmentos, indice = buscaSegmento(idSegmento);
+    int existe = 0;
+    PROCESSO_SCHEDULER *busca = kernel->scheduler.head->prox, *head = kernel->scheduler.head;
+    while (busca != head && !existe) {
+        if (busca->processo->id != idProcesso && busca->processo->idSegmento == idSegmento)
+            existe = 1;
+    }
 
-    SEGMENTO segmento = tabelaSegmento.segmentos[indice];
-    tabelaSegmento.memoriaRestante =
-            MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento.memoriaRestante + segmento.paginaQuantMemoria);
+    if (!existe) { // Se existir outro processo que esteja utilizando do segmento ele não será removido
+        int qtd = tabelaSegmento->quantSegmentos, indice = buscaSegmento(idSegmento);
 
-    for (; indice < qtd - 1; indice++)
-        tabelaSegmento.segmentos[indice] = tabelaSegmento.segmentos[indice + 1];
+        SEGMENTO segmento = tabelaSegmento->segmentos[indice];
+        tabelaSegmento->memoriaRestante =
+                MIN(TAMANHO_MAX_MEMORIA, tabelaSegmento->memoriaRestante + segmento.paginaQuantMemoria);
 
-    // Realoca a tabela de segmentos para quantidade - 1
-    tabelaSegmento.segmentos = (SEGMENTO *) realloc(tabelaSegmento.segmentos, sizeof(SEGMENTO) * (qtd - 1));
-    if (!tabelaSegmento.segmentos && tabelaSegmento.segmentos != 0) {
-        erro("Sem memoria");
-        exit(EXIT_FAILURE);
+        for (; indice < qtd - 1; indice++)
+            tabelaSegmento->segmentos[indice] = tabelaSegmento->segmentos[indice + 1];
+
+        // Realoca a tabela de segmentos para quantidade - 1
+        tabelaSegmento->segmentos = (SEGMENTO *) realloc(tabelaSegmento->segmentos, sizeof(SEGMENTO) * (qtd - 1));
+        if (!tabelaSegmento->segmentos && tabelaSegmento->quantSegmentos != 0) {
+            erro("Sem memoria");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -525,7 +537,6 @@ SCHEDULER schedule_process(int flag) {
 
     if (novo)
         novo->processo->estado = EXECUTANDO;
-
     scheduler.scheduled = novo;
     return scheduler;
 }
@@ -636,9 +647,7 @@ void sysCall(char function, void *arg) {
 }
 
 static void sleep() {
-    pthread_mutex_lock(&mutexScheduler);
     interruptControl(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED);
-    pthread_mutex_unlock(&mutexScheduler);
 }
 
 static void wakeup(PROCESSO *processo) {
