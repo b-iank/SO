@@ -9,6 +9,7 @@ static void sleep();
 static void wakeup(PROCESSO *proc);
 
 void printaProcesso(int id, char nome[50], char estado, int prioridade);
+
 void printaSegmento(int id, int quantidade);
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
@@ -82,7 +83,7 @@ void P(SEMAFORO *semaforo, PROCESSO *processo, void (*sleep)(void)) {
             exit(EXIT_FAILURE);
         }
 
-        semaforo->idAguardando[semaforo->aguardando-1] = processo->id;
+        semaforo->idAguardando[semaforo->aguardando - 1] = processo->id;
         sleep();
     }
     sem_post(&semaforo->mutex);
@@ -93,7 +94,7 @@ void V(SEMAFORO *semaforo, void (*wakeup)(PROCESSO *)) {
     semaforo->S++;
     if (semaforo->S <= 0 && semaforo->aguardando > 0) {
         semaforo->aguardando--;
-        int id = semaforo->idAguardando[0], aux;
+        int id = semaforo->idAguardando[0];
         for (int i = 0; i < semaforo->aguardando; i++)
             semaforo->idAguardando[i] = semaforo->idAguardando[i + 1];
         PROCESSO *aguardando = buscaProcessoID(id);
@@ -275,7 +276,7 @@ void readSyntheticProgram(FILE *arquivo, PROCESSO **process) {
 void processFinish(PROCESSO *processo) {
     if (processo) {
         pthread_mutex_lock(&mutexScheduler);
-        interruptControl(PROCESS_INTERRUPT, (void*) FINISHED);
+        interruptControl(PROCESS_INTERRUPT, (void *) FINISHED);
 
         freeSegmento(processo->idSegmento, processo->id);
         removeScheduler(processo);
@@ -300,9 +301,6 @@ PROCESSO *buscaProcessoID(int id) {
 void avalia(PROCESSO *processo) {
     INSTRUCAO *instr = &processo->codigo[processo->pc];
     printf("%d ", processo->pc);
-    if (processo->pc == 5) {
-        printf("");
-    }
     switch (instr->op) {
         case EXEC: {
             if (processo->tempoRestante < instr->value) {
@@ -312,7 +310,6 @@ void avalia(PROCESSO *processo) {
                 processo->tempoRestante = processo->tempoRestante - instr->value;
                 processo->pc++;
             }
-            // printf("%d %d %d %d %d\n", processo->tempoRestante, processo->codigo->value, instr);
             break;
         }
         case SEM_P: {
@@ -439,8 +436,7 @@ int buscaSegmento(int idSegmento) {
     TABELA_SEGMENTO tabelaSegmento = kernel->seg_table;
 
     int qtd = tabelaSegmento.quantSegmentos, indice;
-    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++)
-        ;
+    for (indice = 0; indice < qtd && tabelaSegmento.segmentos[indice].id != idSegmento; indice++);
     if (indice == qtd + 1)
         return -1;
     return indice;
@@ -500,29 +496,25 @@ SCHEDULER schedule_process(int flag) {
     SCHEDULER scheduler = kernel->scheduler;
     PROCESSO_SCHEDULER *atual = scheduler.scheduled, *novo = NULL;
 
-    if (flag == SEMAPHORE_BLOCKED)
-        printf("oi");
     PROCESSO_SCHEDULER *aux = atual;
     if (aux) aux = aux->prox;
     while (aux && aux->processo->estado != PRONTO && aux->prox != atual)
         aux = aux->prox;
     // EXECUTANDO PRONTO EXECUTANDO
     if (aux && aux->processo->estado == PRONTO) {
-        novo = aux->prox;
+        novo = aux;
         novo->processo->tempoRestante = novo->processo->tempoMaximo;
     }
 
     if (atual) {
-        if (flag == IO_REQUESTED || flag == SEMAPHORE_BLOCKED) {
+        if (flag == IO_REQUESTED || flag == SEMAPHORE_BLOCKED)
             atual->processo->estado = BLOQUEADO;
-        } else if (flag == QUANTUM_COMPLETED) {
-            atual->processo->estado = PRONTO;
-        }
         else if (flag == FINISHED) {
             atual->processo->estado = CONCLUIDO;
             if (novo == atual)
                 novo = NULL;
-        }
+        } else // QUANTUM COMPLETED OU NONE (Preempção)
+            atual->processo->estado = PRONTO;
     } else if (scheduler.head) {
         novo = scheduler.head;
         novo->processo->tempoRestante = novo->processo->tempoMaximo;
@@ -542,7 +534,7 @@ void removeScheduler(PROCESSO *processo) {
         removido = removido->prox;
     }
     if (prev == removido)
-            scheduler->head = scheduler->tail = NULL;
+        scheduler->head = scheduler->tail = NULL;
     else
         prev->prox = removido->prox;
     free(removido);
@@ -564,8 +556,7 @@ void printaProcessos() {
         }
     }
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
-    while (!getchar())
-        ;
+    while (!getchar());
 }
 
 void printaMemoria() {
@@ -581,8 +572,7 @@ void printaMemoria() {
         }
 
         printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
-        while (!getchar())
-            ;
+        while (!getchar());
     }
 }
 
@@ -691,8 +681,7 @@ void cpu_init() {
 }
 
 _Noreturn void cpu() {
-    while (!kernel)
-        ;
+    while (!kernel);
 
     struct timespec start;
     struct timespec end;
@@ -702,8 +691,7 @@ _Noreturn void cpu() {
     while (1) {
         if (!kernel->scheduler.head) {
             continue;
-        }
-        else if (!kernel->scheduler.scheduled) {
+        } else if (!kernel->scheduler.scheduled) {
             pthread_mutex_lock(&mutexScheduler);
             kernel->scheduler = schedule_process(NONE);
             pthread_mutex_unlock(&mutexScheduler);
@@ -727,13 +715,11 @@ _Noreturn void cpu() {
             if (kernel->scheduler.scheduled == NULL)
                 continue;
 
-            printf("%d\n", kernel->scheduler.scheduled->processo->pc);
             if (kernel->scheduler.scheduled->processo->pc >= kernel->scheduler.scheduled->processo->numComandos) {
-                sysCall(PROCESS_FINISH, (void*) kernel->scheduler.scheduled->processo);
-            }
-            else {
+                sysCall(PROCESS_FINISH, (void *) kernel->scheduler.scheduled->processo);
+            } else {
                 pthread_mutex_lock(&mutexScheduler);
-                sysCall(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+                interruptControl(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
                 pthread_mutex_unlock(&mutexScheduler);
             }
         }
