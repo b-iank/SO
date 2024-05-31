@@ -53,7 +53,7 @@ void print_process(int id, char name[50], char state, int priority, int arrival)
 }
 
 void print_segment(int id, int pages) {
-    printf("│ %05d │ %05d              │\n", id, pages);
+    printf("│ %05d │ %06d             │\n", id, pages);
     printf("└────────────────────────────┘\n");
 }
 
