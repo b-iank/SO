@@ -609,9 +609,9 @@ void print_running_process() {
     CLEAR;
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     if (kernel->scheduler.scheduled) {
-        printf("\n┌────────────┬─────────┐\n");
+        printf("\n┌────────────┬──────────┐\n");
         printf("│ %-10s │ %-8s │\n", "Nome", "Operacao");
-        printf("├────────────┼─────────┤\n");
+        printf("├────────────┼──────────┤\n");
         print = 1;
     } else {
         so_alert("┌────────────────────────────────────────────┐");
@@ -648,7 +648,7 @@ void print_segment_table() {
     CLEAR;
     if (table.qnt_segments > 0) {
         printf("┌────────────────────────────┐\n");
-        printf("│ %-27s │\n", "SEGMENTOS");
+        printf("│ %-26s │\n", "SEGMENTOS");
         printf("├────────────────────────────┤\n");
         printf("│ %-5s │ %-10s │\n", "ID", "Quantidade Paginas");
         for (int i = 0; i < table.qnt_segments; i++)
@@ -659,7 +659,7 @@ void print_segment_table() {
         so_alert("└───────────────────────────────────────────┘");
     }
 
-    printf("USO DA MEMORIA: %d%%", (kernel->segment_table.remaining_memory/MAX_MEMORY_SIZE)*100);
+    printf("MEMORIA DISPONIVEL: %d%%\n", (kernel->segment_table.remaining_memory/MAX_MEMORY_SIZE)*100);
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     scanf("%c", &next);
     while (!getchar());
