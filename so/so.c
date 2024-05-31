@@ -572,9 +572,9 @@ void print_pcb_processes() {
     PROCESS *process = pcb.head;
     CLEAR;
     if (process) {
-        printf("┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐\n");
-        printf("│ %-5s │ %-50s │ %-10s │ %-10s │ %-16s │\n", "ID", "Nome", "Estado", "Prioridade", "Tempo de chegada");
-        printf("└──────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
+        printf("┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐\n");
+        printf("│ %-4s │ %-50s │ %-10s │ %-10s │ %-16s │\n", "ID", "Nome", "Estado", "Prioridade", "Tempo de chegada");
+        printf("├────────────────────────────────────────────────────────────────────────────────────────────────────────┤\n");
         print_process(process->id, process->name, process->state, process->priority, process->arrival_time);
         while (process->next != pcb.head) {
             process = process->next;
@@ -593,11 +593,12 @@ void print_pcb_processes() {
 
 void print_running_process() {
     char next;
+    CLEAR;
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     if (kernel->scheduler.scheduled) {
-        printf("\n┌────────────────────────┐\n");
+        printf("\n┌───────────────────────┐\n");
         printf("│ %-10s │ %-8s │\n", "Nome", "Operacao");
-        printf("└────────────────────────┘\n");
+        printf("├───────────────────────┤\n");
         print = 1;
     } else {
         so_alert("┌────────────────────────────────────────────┐");
@@ -633,10 +634,10 @@ void print_segment_table() {
 
     CLEAR;
     if (table.qnt_segments > 0) {
-        printf("┌─────────────────────────────┐\n");
+        printf("┌────────────────────────────┐\n");
         printf("│ %-27s │\n", "SEGMENTOS");
-        printf("└─────────────────────────────┘\n");
-        printf("│ %-5s │ %-10s │\n", "ID", "Quantidade Páginas");
+        printf("├────────────────────────────┤\n");
+        printf("│ %-5s │ %-10s │\n", "ID", "Quantidade Paginas");
         for (int i = 0; i < table.qnt_segments; i++)
             print_segment(table.segments[i].id, table.segments[i].qnt_page_memory);
     } else {

@@ -47,14 +47,14 @@ void print_process(int id, char name[50], char state, int priority, int arrival)
     else if (state == '3')
         strcpy(state_string, "EXECUTANDO");
     else if (state == '4')
-        strcpy(state_string, "DONE");
-    printf("│ %04d │ %-50s │ %-10s │ %02d │ %016d │\n", id, name, state_string, priority, arrival);
-    printf("└────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
+        strcpy(state_string, "CONCLUIDO");
+    printf("│ %04d │ %-50s │ %-10s │ %02d         │ %016d │\n", id, name, state_string, priority, arrival);
+    printf("└──────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
 }
 
 void print_segment(int id, int pages) {
-    printf("│ %05d │ %05d      │\n", id, pages);
-    printf("└───────────────────────────┘\n");
+    printf("│ %05d │ %05d            │\n", id, pages);
+    printf("└────────────────────────────┘\n");
 }
 
 void so_sucess(char *message) { printf(SUCESS "%s\n" LIMPA, message); }
