@@ -14,7 +14,7 @@ int main_menu() {
         printf("\nOpcao: ");
         ret = scanf("%d", &op);
 
-        if (ret != 1 || op < 0 || op > 3) {
+        if (ret != 1 || op < 0 || op > 4) {
             printf(ERROR BOLD "OPCAO INVALIDA!\n" LIMPA);
             while (getchar() != '\n')
                 ; // Limpa o buffer do teclado para evitar comportamentos inesperados
@@ -36,7 +36,7 @@ void print_name() {
 }
 
 
-void print_process(int id, char name[50], char state, int priority) {
+void print_process(int id, char name[50], char state, int priority, int arrival) {
     char state_string[11];
     if (state == '0')
         strcpy(state_string, "NOVO");
@@ -48,8 +48,8 @@ void print_process(int id, char name[50], char state, int priority) {
         strcpy(state_string, "EXECUTANDO");
     else if (state == '4')
         strcpy(state_string, "DONE");
-    printf("│ %04d │ %-50s │ %-10s │ %02d│\n", id, name, state_string, priority);
-    printf("└─────────────────────────────────────────────────────────────────────────────────┘\n");
+    printf("│ %04d │ %-50s │ %-10s │ %02d │ %016d │\n", id, name, state_string, priority, arrival);
+    printf("└────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
 }
 
 void print_segment(int id, int pages) {

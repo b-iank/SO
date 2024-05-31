@@ -5,7 +5,7 @@
 
 KERNEL *kernel;
 
-void tela();
+void screen();
 
 int main() {
     print_name();
@@ -14,11 +14,11 @@ int main() {
     kernel = kernel_init();
     cpu_init();
 
-    tela();
+    screen();
     return 0;
 }
 
-void tela() {
+void screen() {
     int op;
     char file_name[255];
     do {
@@ -27,6 +27,7 @@ void tela() {
             printf("Digite o nome do arquivo: ");
             scanf("%s", file_name);
             sys_call(PROCESS_CREATE, file_name);
+            so_sucess("Processo criado!");
         } else if (op == 2)
             print_running_process();
         else if (op == 3)
@@ -34,6 +35,6 @@ void tela() {
         else if (op == 4)
             print_segment_table();
         else
-            printf("Adeus Aleardo :D");
+            so_sucess("Adeus Aleardo :D");
     } while (op != 0);
 }

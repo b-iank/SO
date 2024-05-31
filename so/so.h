@@ -50,7 +50,7 @@
 #define SEMAPHORE_BLOCKED 0x4
 #define FINISHED 0x6
 
-#define ONE_SECOND_NS (1000000000L)
+#define ONE_SECOND_NS (1000000000)
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
 #define MIN(a, b) ((a) >= (b) ? (b) : (a))
 
@@ -95,6 +95,7 @@ struct process {
     int id;
     int max_time;
     int remaining_time;
+    int arrival_time;
 
     char state;
     int pc;

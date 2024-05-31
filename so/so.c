@@ -246,6 +246,7 @@ PROCESS * read_synthetic_program(FILE *fp) {
     }
 
     process->code = code;
+    process->arrival_time = kernel->time;
     fclose(fp);
 
     return process;
@@ -296,11 +297,11 @@ void run_process(PROCESS *process) {
     pthread_mutex_lock(&mutex_memory);
     SEGMENT *segmento = &kernel->segment_table.segments[find_segment(process->segment_id)];
     if (segmento->qnt_page_memory < segmento->qnt_page) {
-        int request = MEMORY_PAGE_SIZE * (segmento->qnt_page - segmento->qnt_page_memory); // em kbytes
-        int remaining = (kernel->segment_table.remaining_memory) - request * K; // memoria remaining em bytes
+        int request = MEMORY_PAGE_SIZE * (segmento->qnt_page - segmento->qnt_page_memory);
+        int remaining = (kernel->segment_table.remaining_memory) - request * K;
 
         if (kernel->segment_table.remaining_memory <= 0)
-            page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE); // em kbytes
+            page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE);
         else if (remaining < 0)
             page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE - kernel->segment_table.remaining_memory / K);
         load_memory_page(segmento, request);
@@ -319,6 +320,7 @@ void run_process(PROCESS *process) {
                 process->remaining_time = process->remaining_time - code->value;
                 process->pc++;
             }
+            kernel->time += code->value;
             break;
         }
         case SEM_P: {
@@ -327,12 +329,14 @@ void run_process(PROCESS *process) {
             if (process->state != BLOCKED)
                 process->remaining_time = MAX(0, process->remaining_time - 200);
             process->pc++;
+            kernel->time += 200;
             break;
         }
         case SEM_V: {
             sys_call(SEMAPHORE_V, find_semaphore(code->sem));
             process->remaining_time = MAX(0, process->remaining_time - 200);
             process->pc++;
+            kernel->time += 200;
             break;
         }
         default:
@@ -563,25 +567,27 @@ void remove_scheduler(PROCESS *process) {
 
 // ------------------------------------- FUNÇÕES LOG -------------------------------------------
 void print_pcb_processes() {
+    char next;
     PCB pcb = kernel->pcb;
     PROCESS *process = pcb.head;
     CLEAR;
     if (process) {
-        printf("┌───────────────────────────────────────────────────────────────────────────────────┐\n");
-        printf("│ %-5s │ %-50s │ %-10s │ %-10s │\n", "ID", "Nome", "Estado", "Prioridade");
-        printf("└───────────────────────────────────────────────────────────────────────────────────┘\n");
-        print_process(process->id, process->name, process->state, process->priority);
+        printf("┌──────────────────────────────────────────────────────────────────────────────────────────────────────┐\n");
+        printf("│ %-5s │ %-50s │ %-10s │ %-10s │ %-16s │\n", "ID", "Nome", "Estado", "Prioridade", "Tempo de chegada");
+        printf("└──────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
+        print_process(process->id, process->name, process->state, process->priority, process->arrival_time);
         while (process->next != pcb.head) {
             process = process->next;
-            print_process(process->id, process->name, process->state, process->priority);
+            print_process(process->id, process->name, process->state, process->priority, process->arrival_time);
         }
     } else {
-        so_alert("┌────────────────────────────────────────┐");
-        so_alert("│ NAO EXISTE PROCESSOS NA PCB NO MOMENTO │");
-        so_alert("└────────────────────────────────────────┘");
+        so_alert("┌─────────────────────────────────────────┐");
+        so_alert("│ NAO EXISTEM PROCESSOS NA PCB NO MOMENTO │");
+        so_alert("└─────────────────────────────────────────┘");
     }
 
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+    scanf("%c", &next);
     while (!getchar());
 }
 
@@ -594,9 +600,9 @@ void print_running_process() {
         printf("└────────────────────────┘\n");
         print = 1;
     } else {
-        so_alert("┌─────────────────────────────────────────────┐");
-        so_alert("│ NAO EXISTE PROCESSOS EM EXECUCAO NO MOMENTO │");
-        so_alert("└─────────────────────────────────────────────┘");
+        so_alert("┌────────────────────────────────────────────┐");
+        so_alert("│ NAO EXISTE PROCESSO EM EXECUCAO NO MOMENTO │");
+        so_alert("└────────────────────────────────────────────┘");
     }
 
     scanf("%c", &next);
@@ -623,6 +629,7 @@ void print_code(char name[50], char op) {
 
 void print_segment_table() {
     SEGMENT_TABLE table = kernel->segment_table;
+    char next;
 
     CLEAR;
     if (table.qnt_segments > 0) {
@@ -633,12 +640,13 @@ void print_segment_table() {
         for (int i = 0; i < table.qnt_segments; i++)
             print_segment(table.segments[i].id, table.segments[i].qnt_page_memory);
     } else {
-        so_alert("┌──────────────────────────────────────────┐");
-        so_alert("│ NAO EXISTE SEGMENTOS ALOCADOS NO MOMENTO │");
-        so_alert("└──────────────────────────────────────────┘");
+        so_alert("┌───────────────────────────────────────────┐");
+        so_alert("│ NAO EXISTEM SEGMENTOS ALOCADOS NO MOMENTO │");
+        so_alert("└───────────────────────────────────────────┘");
     }
 
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+    scanf("%c", &next);
     while (!getchar());
 }
 
@@ -747,6 +755,7 @@ void cpu_init() {
 _Noreturn void cpu() {
     while (!kernel);
 
+    double elapsed;
     struct timespec start;
     struct timespec end;
 
@@ -762,9 +771,9 @@ _Noreturn void cpu() {
         } else {
             do {
                 clock_gettime(CLOCK_REALTIME, &end);
-                const int elapsed = (end.tv_sec - start.tv_sec) * ONE_SECOND_NS + (end.tv_nsec - start.tv_nsec);
+                elapsed = difftime(end.tv_sec, start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / ONE_SECOND_NS;
 
-                if (elapsed >= ONE_SECOND_NS) {
+                if (elapsed >= 0.75) {
                     start = end;
                     pthread_mutex_lock(&mutex_scheduler);
                     run_process(kernel->scheduler.scheduled->process);
