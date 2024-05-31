@@ -649,8 +649,9 @@ void print_segment_table() {
     if (table.qnt_segments > 0) {
         printf("┌────────────────────────────┐\n");
         printf("│ %-26s │\n", "SEGMENTOS");
-        printf("├────────────────────────────┤\n");
+        printf("├───────┬────────────────────┤\n");
         printf("│ %-5s │ %-10s │\n", "ID", "Quantidade Paginas");
+        printf("├───────┼────────────────────┤\n");
         for (int i = 0; i < table.qnt_segments; i++)
             print_segment(table.segments[i].id, table.segments[i].qnt_page_memory);
     } else {
