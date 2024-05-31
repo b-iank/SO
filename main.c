@@ -27,10 +27,6 @@ void screen() {
             printf("Digite o nome do arquivo: ");
             scanf("%s", file_name);
             sys_call(PROCESS_CREATE, file_name);
-
-            printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
-            scanf("%c", &next);
-            while (!getchar());
         } else if (op == 2)
             print_running_process();
         else if (op == 3)

@@ -110,7 +110,7 @@ void process_create(char *file_name) {
     PROCESS *process = NULL;
 
     if (!(fp = fopen(file_name, "r"))) {
-        so_alert("Arquivo nao encontrado");
+        so_define(2, "Arquivo nao encontrado");
         return;
     }
 
@@ -150,7 +150,7 @@ PCB add_process(PROCESS *process) {
     return lista_aux;
 }
 
-PROCESS * read_synthetic_program(FILE *fp) {
+PROCESS *read_synthetic_program(FILE *fp) {
     PROCESS *process;
     long int code_section;
     int qnt_codes;
@@ -211,11 +211,14 @@ PROCESS * read_synthetic_program(FILE *fp) {
     char op[51];
     int i = 0;
     while (fgets(op, 51, fp) != NULL) {
-        if (op[0] == 'P' || op[0] == 'V') {
+        if (op[0] == '\n') {
+            process->qnt_code--;
+            continue;
+        } else if (op[0] == 'P' || op[0] == 'V') {
             if (!semaphore_process_exists(op[2], process)) {
                 char error_msg[255];
                 sprintf(error_msg, "O semaphores %c nao existe - Processo %s nao criado", op[2], name);
-                so_error(error_msg);
+                so_define(3, error_msg);
                 free(code);
                 free(process);
                 return NULL;
@@ -239,7 +242,7 @@ PROCESS * read_synthetic_program(FILE *fp) {
             else {
                 char error_msg[255];
                 sprintf(error_msg, "Operacao %s invalida - Processo %s nao criado", left_op, name);
-                so_error(error_msg);
+                so_define(3, error_msg);
                 free(code);
                 free(process);
                 return NULL;
@@ -264,7 +267,7 @@ int count_codes(FILE *fp) {
     if (size != 0) {
         while (line != EOF) {
             if (line == '\n')
-                num_lines = num_lines + 1;
+                num_lines++;
             line = getc(fp);
         }
     } else
@@ -311,7 +314,7 @@ void run_process(PROCESS *process) {
         if (kernel->segment_table.remaining_memory <= 0)
             page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE);
         else if (remaining < 0)
-            page_swap((segmento->qnt_page * MEMORY_PAGE_SIZE) - (int) (kernel->segment_table.remaining_memory/K));
+            page_swap((segmento->qnt_page * MEMORY_PAGE_SIZE) - (int) (kernel->segment_table.remaining_memory / K));
         load_memory_page(segmento, request);
     }
     pthread_mutex_unlock(&mutex_memory);
@@ -660,7 +663,7 @@ void print_segment_table() {
         so_alert("└───────────────────────────────────────────┘");
     }
 
-    printf("MEMORIA DISPONIVEL: %d%%\n", (kernel->segment_table.remaining_memory/MAX_MEMORY_SIZE)*100);
+    printf("MEMORIA DISPONIVEL: %d%%\n", (kernel->segment_table.remaining_memory / MAX_MEMORY_SIZE) * 100);
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     scanf("%c", &next);
     while (!getchar());
@@ -735,13 +738,13 @@ void interrupt_control(char function, void *arg) {
             interrupt_control(PROCESS_INTERRUPT, NONE);
 
             pthread_mutex_unlock(&mutex_scheduler);
-            so_sucess("Processo criado!");
+            so_define(1, "Processo criado!");
             break;
         }
         default: {
             char error_msg[255];
             sprintf(error_msg, "O process %c nao esta definido", function);
-            so_alert(error_msg);
+            so_define(2, error_msg);
         }
     }
 }
@@ -788,7 +791,7 @@ _Noreturn void cpu() {
         } else {
             do {
                 clock_gettime(CLOCK_REALTIME, &end);
-                elapsed = difftime(end.tv_sec, start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / ONE_SECOND_NS;
+                elapsed = difftime(end.tv_sec, start.tv_sec) + (double) (end.tv_nsec - start.tv_nsec) / ONE_SECOND_NS;
 
                 if (elapsed >= 0.75) {
                     start = end;

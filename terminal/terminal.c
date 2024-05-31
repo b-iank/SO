@@ -1,9 +1,19 @@
 #include "terminal.h"
 
+int status_message;
+char str_message[255];
+
 int main_menu() {
     int op = -1, ret;
 
     CLEAR
+    if (status_message == 1)
+        so_sucess(str_message);
+    else if (status_message == 2)
+        so_alert(str_message);
+    else if (status_message == 3)
+        so_error(str_message);
+    status_message = -1;
     printf(ORANGE BOLD UNDERLINE "\n------------ Zz SISTEMA OPERACIONAL zZ ------------\n" LIMPA);
     do {
         printf("1 - Adicionar processo\n");
@@ -55,6 +65,11 @@ void print_process(int id, char name[50], char state, int priority, int arrival)
 void print_segment(int id, int pages) {
     printf("│ %05d │ %06d             │\n", id, pages);
     printf("└────────────────────────────┘\n");
+}
+
+void so_define(int status, char *message) {
+    status_message = status;
+    strcpy(str_message, message);
 }
 
 void so_sucess(char *message) { printf(SUCESS "%s\n" LIMPA, message); }
