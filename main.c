@@ -9,7 +9,7 @@ void screen();
 
 int main() {
     print_name();
-    sleep(5);
+    sleep(3);
 
     kernel = kernel_init();
     cpu_init();

@@ -129,7 +129,7 @@ PCB add_process(PROCESS *process) {
         return lista_aux;
     }
 
-    while (process->priority > aux->priority && aux->next != head) {
+    while (process->priority >= aux->priority && aux->next != head) { // TODO: validar isso aqui
         anterior = aux;
         aux = aux->next;
     }
@@ -495,7 +495,7 @@ SCHEDULER add_process_scheduler(PROCESS *process) {
 
     PROCESS_SCHEDULER *aux = scheduler.head;
     PROCESS *aux_process = aux->process;
-    while (process->priority > aux_process->priority && aux->next != head) {
+    while (process->priority >= aux_process->priority && aux->next != head) { // TODO: validar esse while
         prev = aux;
         aux = aux->next;
         aux_process = aux->process;
