@@ -206,15 +206,15 @@ PROCESS *read_synthetic_program(FILE *fp) {
         exit(EXIT_FAILURE);
     }
 
-    process->qnt_code = qnt_codes;
+    process->qnt_code = 0;
 
     char op[51];
     int i = 0;
     while (fgets(op, 51, fp) != NULL) {
         if (op[0] == '\n') {
-            process->qnt_code--;
             continue;
         } else if (op[0] == 'P' || op[0] == 'V') {
+            process->qnt_code++;
             if (!semaphore_process_exists(op[2], process)) {
                 char error_msg[255];
                 sprintf(error_msg, "O semaphores %c nao existe - Processo %s nao criado", op[2], name);
@@ -226,6 +226,7 @@ PROCESS *read_synthetic_program(FILE *fp) {
             code[i].op = op[0] == 'P' ? SEM_P : SEM_V;
             code[i].sem = op[2];
         } else {
+            process->qnt_code++;
             char *left_op = malloc(sizeof(char) * 6);
             int right_op;
 
@@ -254,6 +255,10 @@ PROCESS *read_synthetic_program(FILE *fp) {
     }
 
     process->code = code;
+    if (!realloc(process->code, process->qnt_code * sizeof(CODE))) {
+        so_error("Sem memoria");
+        exit(EXIT_FAILURE);
+    }
     process->arrival_time = kernel->time;
     fclose(fp);
 
