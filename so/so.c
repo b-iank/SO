@@ -1,6 +1,7 @@
 #include "../so/so.h"
 
 #include <math.h>
+#include <unistd.h>
 
 pthread_mutex_t mutex_scheduler;
 pthread_mutex_t mutex_memory;
@@ -129,11 +130,15 @@ PCB add_process(PROCESS *process) {
         return lista_aux;
     }
 
-    while (process->priority >= aux->priority && aux->next != head) { // TODO: validar isso aqui
+    while (process->priority >= aux->priority && aux->next != head) {
         anterior = aux;
         aux = aux->next;
     }
 
+    if (aux->next == head && process->priority >= aux->priority) {
+        anterior = aux;
+        aux = aux->next;
+    }
     process->next = aux;
     anterior->next = process;
 
@@ -299,11 +304,14 @@ void run_process(PROCESS *process) {
     if (segmento->qnt_page_memory < segmento->qnt_page) {
         int request = MEMORY_PAGE_SIZE * (segmento->qnt_page - segmento->qnt_page_memory);
         int remaining = (kernel->segment_table.remaining_memory) - request * K;
-
+        // 1024 - 8 * 1 * 1024
+        // -7.168
+        // 6 * 8 = 24 kbytes - (1024/1024) 1 kbyte
+        //
         if (kernel->segment_table.remaining_memory <= 0)
             page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE);
         else if (remaining < 0)
-            page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE - kernel->segment_table.remaining_memory / K);
+            page_swap((segmento->qnt_page * MEMORY_PAGE_SIZE) - (int) (kernel->segment_table.remaining_memory/K));
         load_memory_page(segmento, request);
     }
     pthread_mutex_unlock(&mutex_memory);
@@ -375,7 +383,7 @@ void load_memory_request(PROCESS *process) {
 
         if (segment_table->remaining_memory <= 0)
             page_swap(segment->qnt_page * MEMORY_PAGE_SIZE);
-        else if (restante < 0) // TODO: testar esse else if
+        else if (restante < 0)
             page_swap(segment->qnt_page * MEMORY_PAGE_SIZE - segment_table->remaining_memory / K);
 
         load_memory_page(segment, segment->qnt_page * MEMORY_PAGE_SIZE);
@@ -495,10 +503,15 @@ SCHEDULER add_process_scheduler(PROCESS *process) {
 
     PROCESS_SCHEDULER *aux = scheduler.head;
     PROCESS *aux_process = aux->process;
-    while (process->priority >= aux_process->priority && aux->next != head) { // TODO: validar esse while
+    while (process->priority >= aux_process->priority && aux->next != head) {
         prev = aux;
         aux = aux->next;
         aux_process = aux->process;
+    }
+
+    if (aux->next == head && process->priority >= aux_process->priority) {
+        prev = aux;
+        aux = aux->next;
     }
 
     new->next = aux;
@@ -572,9 +585,9 @@ void print_pcb_processes() {
     PROCESS *process = pcb.head;
     CLEAR;
     if (process) {
-        printf("┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐\n");
+        printf("┌──────┬────────────────────────────────────────────────────┬────────────┬────────────┬──────────────────┐\n");
         printf("│ %-4s │ %-50s │ %-10s │ %-10s │ %-16s │\n", "ID", "Nome", "Estado", "Prioridade", "Tempo de chegada");
-        printf("├────────────────────────────────────────────────────────────────────────────────────────────────────────┤\n");
+        printf("├──────┼────────────────────────────────────────────────────┼────────────┼────────────┼──────────────────┤\n");
         print_process(process->id, process->name, process->state, process->priority, process->arrival_time);
         while (process->next != pcb.head) {
             process = process->next;
@@ -596,9 +609,9 @@ void print_running_process() {
     CLEAR;
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     if (kernel->scheduler.scheduled) {
-        printf("\n┌───────────────────────┐\n");
+        printf("\n┌────────────┬─────────┐\n");
         printf("│ %-10s │ %-8s │\n", "Nome", "Operacao");
-        printf("├───────────────────────┤\n");
+        printf("├────────────┼─────────┤\n");
         print = 1;
     } else {
         so_alert("┌────────────────────────────────────────────┐");
@@ -646,6 +659,7 @@ void print_segment_table() {
         so_alert("└───────────────────────────────────────────┘");
     }
 
+    printf("USO DA MEMORIA: %d%%", (kernel->segment_table.remaining_memory/MAX_MEMORY_SIZE)*100);
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     scanf("%c", &next);
     while (!getchar());
@@ -720,6 +734,7 @@ void interrupt_control(char function, void *arg) {
             interrupt_control(PROCESS_INTERRUPT, NONE);
 
             pthread_mutex_unlock(&mutex_scheduler);
+            so_sucess("Processo criado!");
             break;
         }
         default: {

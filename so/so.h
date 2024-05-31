@@ -118,8 +118,8 @@ struct code {
 
 struct segment {
     int id;
-    int qnt_page; // Quantidade de páginas do process
-    int qnt_page_memory; // Quantidade de págianas que estão na memória
+    int qnt_page; // Quantidade de paginas do process
+    int qnt_page_memory; // Quantidade de paginas que estao na memoria
     int second_chance; // 1 -> 0 -> sai da memoria
 };
 
@@ -147,7 +147,7 @@ struct kernel {
     SEGMENT_TABLE segment_table; // <- Tabela de Segmentos
     SEMAPHORE_TABLE semaphore_table; // <- Guarda a tabela de semáforo
     SCHEDULER scheduler;
-    int time; // <- TODO: contar o time
+    int time;
 };
 
 extern KERNEL *kernel;

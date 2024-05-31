@@ -27,7 +27,6 @@ void screen() {
             printf("Digite o nome do arquivo: ");
             scanf("%s", file_name);
             sys_call(PROCESS_CREATE, file_name);
-            so_sucess("Processo criado!");
         } else if (op == 2)
             print_running_process();
         else if (op == 3)

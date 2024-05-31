@@ -49,7 +49,7 @@ void print_process(int id, char name[50], char state, int priority, int arrival)
     else if (state == '4')
         strcpy(state_string, "CONCLUIDO");
     printf("│ %04d │ %-50s │ %-10s │ %02d         │ %016d │\n", id, name, state_string, priority, arrival);
-    printf("└──────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
+    printf("└─────────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
 }
 
 void print_segment(int id, int pages) {
