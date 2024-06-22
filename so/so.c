@@ -152,16 +152,13 @@ PCB add_process(PROCESS *process) {
 
 PROCESS *read_synthetic_program(FILE *fp) {
     PROCESS *process;
-    long int code_section;
-    int qnt_codes;
 
     process = malloc(sizeof(PROCESS));
 
     char name[255];
 
     // Le cabecalho
-    fscanf(fp, "%s %d %d %d\n", name, &process->segment_id, &process->priority,
-           &process->segment_size);
+    fscanf(fp, "%s %d %d %d\n", name, &process->segment_id, &process->priority, &process->segment_size);
 
     strcpy(process->name, name);
     process->id = kernel->next_id++; // Pega o próximo id de process e soma a variável
@@ -176,7 +173,7 @@ PROCESS *read_synthetic_program(FILE *fp) {
             break;
 
         if (process->qnt_semaphore == MAX_SEMAPHORE) {
-            so_alert("Numero maximo de semaphores alcancado"); //TODO: tirar programas que executam com mais de 10
+            so_alert("Numero maximo de semaphores alcancado"); // TODO: tirar programas que executam com mais de 10
             continue;
         }
         if (semaphore_name == ' ')
@@ -302,19 +299,11 @@ PROCESS *find_process(int id) {
 
 void run_process(PROCESS *process) {
     pthread_mutex_lock(&mutex_memory);
-    SEGMENT *segmento = &kernel->segment_table.segments[find_segment(process->segment_id)];
-    if (segmento->qnt_page_memory < segmento->qnt_page) {
-        int request = MEMORY_PAGE_SIZE * (segmento->qnt_page - segmento->qnt_page_memory);
-        int remaining = (kernel->segment_table.remaining_memory) - request * K;
-        // 1024 - 8 * 1 * 1024
-        // -7.168
-        // 6 * 8 = 24 kbytes - (1024/1024) 1 kbyte
-        //
-        if (kernel->segment_table.remaining_memory <= 0)
-            page_swap(segmento->qnt_page * MEMORY_PAGE_SIZE);
-        else if (remaining < 0)
-            page_swap((segmento->qnt_page * MEMORY_PAGE_SIZE) - (int) (kernel->segment_table.remaining_memory / K));
-        load_memory_page(segmento, request);
+    SEGMENT *segment = &kernel->segment_table.segments[find_segment(process->segment_id)];
+    if (segment->qnt_page_memory < segment->qnt_page) {
+        int request = MEMORY_PAGE_SIZE * (segment->qnt_page - segment->qnt_page_memory);
+        page_request(process, segment, request);
+        load_memory_page(segment, request);
     }
     pthread_mutex_unlock(&mutex_memory);
 
@@ -371,9 +360,8 @@ void load_memory_page(SEGMENT *segment, int request) {
     segment->qnt_page_memory = segment->qnt_page;
 }
 
-void load_memory_request(PROCESS *process) {
+void memory_load_request(PROCESS *process) {
     pthread_mutex_lock(&mutex_memory);
-    SEGMENT_TABLE *segment_table = &kernel->segment_table;
 
     if (find_segment(process->segment_id) == -1) { // Segmento não existe -> cria
         SEGMENT *segment = malloc(sizeof(SEGMENT));
@@ -381,17 +369,23 @@ void load_memory_request(PROCESS *process) {
         segment->qnt_page = (int) ceil((double) ((double) (process->segment_size) / (MEMORY_PAGE_SIZE)));
         segment->second_chance = 1;
 
-        const int restante = segment_table->remaining_memory - process->segment_size * K;
-
-        if (segment_table->remaining_memory <= 0)
-            page_swap(segment->qnt_page * MEMORY_PAGE_SIZE);
-        else if (restante < 0)
-            page_swap(segment->qnt_page * MEMORY_PAGE_SIZE - segment_table->remaining_memory / K);
-
+        page_request(process, segment, process->segment_size);
         load_memory_page(segment, segment->qnt_page * MEMORY_PAGE_SIZE);
         add_segment_table(segment);
     }
     pthread_mutex_unlock(&mutex_memory);
+}
+
+void page_request(PROCESS *process, SEGMENT *segment, int request) {
+    int remaining = (kernel->segment_table.remaining_memory) - request * K;
+    // 1024 - 8 * 1 * 1024
+    // -7.168
+    // 6 * 8 = 24 kbytes - (1024/1024) 1 kbyte
+    //
+    if (kernel->segment_table.remaining_memory <= 0)
+        page_swap(segment->qnt_page * MEMORY_PAGE_SIZE);
+    else if (remaining < 0)
+        page_swap((segment->qnt_page * MEMORY_PAGE_SIZE) - (int) (kernel->segment_table.remaining_memory / K));
 }
 
 void page_swap(int request) {
@@ -445,9 +439,8 @@ void segment_free(int segment_id, int process_id) {
         segment_table->qnt_segments--;
 
         SEGMENT segment = segment_table->segments[index];
-        segment_table->remaining_memory =
-                MIN(MAX_MEMORY_SIZE,
-                    segment_table->remaining_memory + K * (segment.qnt_page_memory * MEMORY_PAGE_SIZE));
+        segment_table->remaining_memory = MIN(
+                MAX_MEMORY_SIZE, segment_table->remaining_memory + K * (segment.qnt_page_memory * MEMORY_PAGE_SIZE));
 
         for (; index < qnt - 1; index++)
             segment_table->segments[index] = segment_table->segments[index + 1];
@@ -532,7 +525,8 @@ SCHEDULER schedule_process(int flag) {
     PROCESS_SCHEDULER *scheduled = scheduler.scheduled, *new = NULL;
 
     PROCESS_SCHEDULER *aux = NULL;
-    if (scheduled) aux = scheduled->next;
+    if (scheduled)
+        aux = scheduled->next;
     while (aux && aux->process->state != READY && aux->next != scheduled)
         aux = aux->next;
 
@@ -587,9 +581,11 @@ void print_pcb_processes() {
     PROCESS *process = pcb.head;
     CLEAR;
     if (process) {
-        printf("┌──────┬────────────────────────────────────────────────────┬────────────┬────────────┬──────────────────┐\n");
+        printf("┌──────┬────────────────────────────────────────────────────┬────────────┬────────────┬────────────────"
+               "──┐\n");
         printf("│ %-4s │ %-50s │ %-10s │ %-10s │ %-16s │\n", "ID", "Nome", "Estado", "Prioridade", "Tempo de chegada");
-        printf("├──────┼────────────────────────────────────────────────────┼────────────┼────────────┼──────────────────┤\n");
+        printf("├──────┼────────────────────────────────────────────────────┼────────────┼────────────┼────────────────"
+               "──┤\n");
         print_process(process->id, process->name, process->state, process->priority, process->arrival_time);
         while (process->next != pcb.head) {
             process = process->next;
@@ -603,7 +599,8 @@ void print_pcb_processes() {
 
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     scanf("%c", &next);
-    while (!getchar());
+    while (!getchar())
+        ;
 }
 
 void print_running_process() {
@@ -622,7 +619,8 @@ void print_running_process() {
     }
 
     scanf("%c", &next);
-    while (!getchar());
+    while (!getchar())
+        ;
     print = 0;
 }
 
@@ -673,7 +671,8 @@ void print_segment_table() {
     printf("MEMORIA DISPONIVEL: %d%%\n", (kernel->segment_table.remaining_memory / MAX_MEMORY_SIZE) * 100);
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     scanf("%c", &next);
-    while (!getchar());
+    while (!getchar())
+        ;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -708,7 +707,7 @@ void sys_call(char function, void *arg) {
             break;
         }
         case MEMORY_LOAD_REQUEST: {
-            load_memory_request((PROCESS *) arg);
+            memory_load_request((PROCESS *) arg);
             interrupt_control(MEMORY_LOAD_FINISH, (PROCESS *) arg);
             break;
         }
@@ -727,7 +726,6 @@ void sys_call(char function, void *arg) {
 }
 
 void interrupt_control(char function, void *arg) {
-
     switch (function) {
         case PROCESS_INTERRUPT: {
             kernel->scheduler = schedule_process((int) arg);
@@ -757,17 +755,14 @@ void interrupt_control(char function, void *arg) {
     }
 }
 
-void process_sleep() {
-    interrupt_control(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED);
-}
+void process_sleep() { interrupt_control(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED); }
 
-void process_wakeup(PROCESS *processo) {
-    processo->state = READY;
-}
+void process_wakeup(PROCESS *processo) { processo->state = READY; }
 // ---------------------------------------------------------------------------------------------
 
 _Noreturn void cpu() {
-    while (!kernel);
+    while (!kernel)
+        ;
 
     double elapsed;
     struct timespec start;
@@ -812,7 +807,7 @@ _Noreturn void cpu() {
 
 // ------------------------------------- FUNÇÕES CPU -------------------------------------------
 void cpu_init() {
-    //init_threads();
+    // init_threads();
     pthread_t cpu_id;
     pthread_attr_t cpu_attr;
 

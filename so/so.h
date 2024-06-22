@@ -177,7 +177,8 @@ void run_process(PROCESS *process);
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
 SEGMENT_TABLE segment_table_init();
 void load_memory_page(SEGMENT *segment, int request);
-void load_memory_request(PROCESS *process);
+void memory_load_request(PROCESS *process);
+void page_request(PROCESS *process, SEGMENT *segment, int request);
 void page_swap(int request);
 void add_segment_table(SEGMENT *segment);
 void segment_free(int segment_id, int process_id);
