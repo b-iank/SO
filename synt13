@@ -1,0 +1,72 @@
+prog_grande
+11
+3
+3072
+a b c d e f g h i j
+
+exec 1000
+P(a)
+read 10
+V(a)
+exec 300
+P(b)
+write 15
+V(b)
+print 50
+exec 200
+P(c)
+read 20
+V(c)
+exec 500
+write 25
+print 60
+exec 700
+P(d)
+read 30
+V(d)
+exec 400
+write 35
+print 70
+exec 800
+P(e)
+read 40
+V(e)
+exec 300
+write 45
+print 80
+exec 500
+P(f)
+read 50
+V(f)
+exec 600
+write 55
+print 90
+exec 400
+P(g)
+read 60
+V(g)
+exec 200
+write 65
+print 100
+exec 1000
+P(h)
+read 70
+V(h)
+exec 500
+write 75
+print 110
+exec 300
+P(i)
+read 80
+V(i)
+exec 400
+write 85
+print 120
+exec 700
+P(j)
+read 90
+V(j)
+exec 600
+write 95
+print 130
+exec 500

@@ -1,0 +1,22 @@
+prog11
+6
+3
+256
+n o p q
+
+exec 250
+read 40
+P(n)
+exec 150
+V(n)
+write 45
+print 70
+P(o)
+exec 200
+V(o)
+P(p)
+exec 100
+V(p)
+P(q)
+exec 400
+V(q)

@@ -1,0 +1,19 @@
+prog7
+2
+3
+256
+d e f
+
+exec 100
+read 5
+P(d)
+exec 200
+V(d)
+write 10
+print 30
+P(e)
+exec 150
+V(e)
+P(f)
+exec 250
+V(f)

@@ -1,0 +1,17 @@
+prog12
+7
+1
+128
+r s
+
+exec 800
+read 50
+write 55
+P(r)
+exec 500
+V(r)
+print 80
+P(s)
+exec 300
+V(s)
+exec 100

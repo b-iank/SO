@@ -175,8 +175,8 @@ PROCESS *read_synthetic_program(FILE *fp) {
         if (semaphore_name == '\n')
             break;
 
-        if (process->qnt_semaphore == MAX_SEMAPHORE) {
-            so_alert("Numero maximo de semaphores alcancado");
+        if (process->qnt_semaphore+1 == MAX_SEMAPHORE) { // ele permitia de 0 ate 10 (11 semaforos)
+            so_alert("Numero maximo de semaphores alcancado"); //TODO: tirar programas que executam com mais de 10
             continue;
         }
         if (semaphore_name == ' ')
@@ -193,28 +193,26 @@ PROCESS *read_synthetic_program(FILE *fp) {
         new_semaphore(semaphore_name);
     }
     fgetc(fp);
-    code_section = ftell(fp);
-    qnt_codes = count_codes(fp) + 1;
-
-    fseek(fp, code_section, SEEK_SET);
-
-
-    CODE *code = (CODE *) malloc(sizeof(CODE) * (qnt_codes));
-
-    if (!code) {
-        so_alert("Sem memoria");
-        exit(EXIT_FAILURE);
-    }
 
     process->qnt_code = 0;
 
+    CODE *code = NULL;
+    int code_count = 0;
     char op[51];
-    int i = 0;
+
     while (fgets(op, 51, fp) != NULL) {
         if (op[0] == '\n') {
             continue;
-        } else if (op[0] == 'P' || op[0] == 'V') {
-            process->qnt_code++;
+        }
+
+        code_count++;
+        code = realloc(code, sizeof(CODE) * code_count);
+        if (!code) {
+            so_alert("Sem memoria");
+            exit(EXIT_FAILURE);
+        }
+
+        if (op[0] == 'P' || op[0] == 'V') {
             if (!semaphore_process_exists(op[2], process)) {
                 char error_msg[255];
                 sprintf(error_msg, "O semaphores %c nao existe - Processo %s nao criado", op[2], name);
@@ -223,12 +221,12 @@ PROCESS *read_synthetic_program(FILE *fp) {
                 free(process);
                 return NULL;
             }
-            code[i].op = op[0] == 'P' ? SEM_P : SEM_V;
-            code[i].sem = op[2];
+            code[code_count - 1].op = op[0] == 'P' ? SEM_P : SEM_V;
+            code[code_count - 1].sem = op[2];
         } else {
-            process->qnt_code++;
-            char *left_op = malloc(sizeof(char) * 6);
+            char left_op[6];
             int right_op;
+            int i = code_count - 1;
 
             sscanf(op, "%s %d", left_op, &right_op);
 
@@ -251,14 +249,10 @@ PROCESS *read_synthetic_program(FILE *fp) {
             code[i].value = right_op;
             code[i].sem = '#';
         }
-        i++;
     }
 
     process->code = code;
-    if (!realloc(process->code, process->qnt_code * sizeof(CODE))) {
-        so_error("Sem memoria");
-        exit(EXIT_FAILURE);
-    }
+    process->qnt_code = code_count;
     process->arrival_time = kernel->time;
     fclose(fp);
 
@@ -326,7 +320,7 @@ void run_process(PROCESS *process) {
 
     CODE *code = &process->code[process->pc];
     if (print)
-        print_code(process->name, code->op);
+        print_code(process->name, code->op); // chegou aqui na execução
     switch (code->op) {
         case EXEC: {
             if (process->remaining_time < code->value) {
@@ -634,18 +628,26 @@ void print_running_process() {
 
 void print_code(char name[50], char op) {
     char op_str[10];
-    if (op == EXEC)
-        strcpy(op_str, "EXEC");
-    else if (op == WRITE)
-        strcpy(op_str, "WRITE");
-    else if (op == READ)
-        strcpy(op_str, "READ");
-    else if (op == SEM_P)
-        strcpy(op_str, "SEM P");
-    else if (op == SEM_V)
-        strcpy(op_str, "SEM V");
-    else if (op == PRINT)
-        strcpy(op_str, "PRINT");
+    switch (op) {
+        case EXEC:
+            strcpy(op_str, "EXEC");
+            break;
+        case WRITE:
+            strcpy(op_str, "WRITE");
+            break;
+        case READ:
+            strcpy(op_str, "READ");
+            break;
+        case SEM_P:
+            strcpy(op_str, "SEM P");
+            break;
+        case SEM_V:
+            strcpy(op_str, "SEM V");
+            break;
+        case PRINT:
+            strcpy(op_str, "PRINT");
+            break;
+    }
     printf("│ %-10s │ %-8s │\n", name, op_str);
 }
 
@@ -725,6 +727,7 @@ void sys_call(char function, void *arg) {
 }
 
 void interrupt_control(char function, void *arg) {
+
     switch (function) {
         case PROCESS_INTERRUPT: {
             kernel->scheduler = schedule_process((int) arg);
@@ -762,20 +765,6 @@ void process_wakeup(PROCESS *processo) {
     processo->state = READY;
 }
 // ---------------------------------------------------------------------------------------------
-
-// ------------------------------------- FUNÇÕES CPU -------------------------------------------
-void cpu_init() {
-    pthread_t cpu_id;
-    pthread_attr_t cpu_attr;
-
-    pthread_mutex_init(&mutex_scheduler, NULL);
-    pthread_mutex_init(&mutex_memory, NULL);
-
-    pthread_attr_init(&cpu_attr);
-    pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
-
-    pthread_create(&cpu_id, NULL, (void *) cpu, NULL);
-}
 
 _Noreturn void cpu() {
     while (!kernel);
@@ -819,5 +808,86 @@ _Noreturn void cpu() {
             }
         }
     }
+}
+
+// ------------------------------------- FUNÇÕES CPU -------------------------------------------
+void cpu_init() {
+    //init_threads();
+    pthread_t cpu_id;
+    pthread_attr_t cpu_attr;
+
+    pthread_t semP_id;
+    pthread_attr_t semP_attr;
+
+    pthread_t semV_id;
+    pthread_attr_t semV_attr;
+
+    pthread_t interrupt_id;
+    pthread_attr_t interrupt_attr;
+
+    pthread_t disk_request_id;
+    pthread_attr_t disk_request_attr;
+
+    pthread_t disk_finish_id;
+    pthread_attr_t disk_finish_attr;
+
+    pthread_t print_request_id;
+    pthread_attr_t print_request_attr;
+
+    pthread_t print_finish_id;
+    pthread_attr_t print_finish_attr;
+
+    pthread_t mem_load_request_id;
+    pthread_attr_t mem_load_request_attr;
+
+    pthread_t mem_load_finish_id;
+    pthread_attr_t mem_load_finish_attr;
+
+    pthread_t process_create_id;
+    pthread_attr_t process_create_attr;
+
+    pthread_t process_finish_id;
+    pthread_attr_t process_finish_attr;
+
+    pthread_mutex_init(&mutex_scheduler, NULL);
+    pthread_mutex_init(&mutex_memory, NULL);
+
+    pthread_attr_init(&cpu_attr);
+    pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&semP_attr);
+    pthread_attr_setscope(&semP_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&semV_attr);
+    pthread_attr_setscope(&semV_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&interrupt_attr);
+    pthread_attr_setscope(&interrupt_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&disk_request_attr);
+    pthread_attr_setscope(&disk_request_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&disk_finish_attr);
+    pthread_attr_setscope(&disk_finish_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&print_request_attr);
+    pthread_attr_setscope(&print_request_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&print_finish_attr);
+    pthread_attr_setscope(&print_finish_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&mem_load_request_attr);
+    pthread_attr_setscope(&mem_load_request_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&mem_load_finish_attr);
+    pthread_attr_setscope(&mem_load_finish_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&process_create_attr);
+    pthread_attr_setscope(&process_create_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_attr_init(&process_finish_attr);
+    pthread_attr_setscope(&process_finish_attr, PTHREAD_SCOPE_SYSTEM);
+
+    pthread_create(&cpu_id, NULL, (void *) cpu, NULL);
 }
 // ---------------------------------------------------------------------------------------------

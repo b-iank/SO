@@ -1,0 +1,19 @@
+prog9
+4
+2
+64
+i j k
+
+exec 400
+read 20
+P(i)
+exec 200
+V(i)
+write 25
+print 40
+P(j)
+exec 100
+V(j)
+P(k)
+exec 350
+V(k)

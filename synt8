@@ -1,0 +1,17 @@
+prog8
+3
+1
+128
+g h
+
+exec 300
+read 7
+write 14
+exec 600
+P(g)
+exec 200
+V(g)
+P(h)
+print 100
+V(h)
+exec 150

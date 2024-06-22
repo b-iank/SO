@@ -1,0 +1,17 @@
+prog10
+5
+4
+512
+l m
+
+exec 700
+P(l)
+exec 200
+V(l)
+read 30
+write 35
+exec 400
+P(m)
+print 60
+V(m)
+exec 300

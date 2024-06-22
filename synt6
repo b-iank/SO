@@ -1,0 +1,16 @@
+prog6
+1
+5
+512
+a b c
+
+exec 500
+P(a)
+read 10
+V(a)
+exec 300
+P(b)
+write 15
+V(b)
+print 50
+exec 200
