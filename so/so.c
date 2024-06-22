@@ -175,7 +175,7 @@ PROCESS *read_synthetic_program(FILE *fp) {
         if (semaphore_name == '\n')
             break;
 
-        if (process->qnt_semaphore+1 == MAX_SEMAPHORE) { // ele permitia de 0 ate 10 (11 semaforos)
+        if (process->qnt_semaphore == MAX_SEMAPHORE) {
             so_alert("Numero maximo de semaphores alcancado"); //TODO: tirar programas que executam com mais de 10
             continue;
         }
