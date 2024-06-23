@@ -12,7 +12,9 @@ int main() {
     sleep(3);
 
     kernel = kernel_init();
+    disk_init();
     cpu_init();
+
 
     screen();
     return 0;
@@ -33,6 +35,8 @@ void screen() {
             print_pcb_processes();
         else if (op == 4)
             print_segment_table();
+        else if (op == 5)
+            print_disk_usage();
         else
             so_sucess("Adeus Aleardo :D");
     } while (op != 0);

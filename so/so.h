@@ -24,10 +24,15 @@
 #define PROCESS_INTERRUPT '1'
 #define PROCESS_CREATE '2'
 #define PROCESS_FINISH '3'
+#define DISK_WRITE_REQUEST '4'
+#define DISK_FINISH '5' // disk finish
 #define MEMORY_LOAD_REQUEST '6'
 #define MEMORY_LOAD_FINISH '7'
 #define SEMAPHORE_P 'A' // 10
 #define SEMAPHORE_V 'B' // 11
+#define DISK_READ_REQUEST 'C' // 12
+#define PRINT_REQUEST 'E' // 14
+#define PRINT_FINISH 'F' // 15
 
 // ESTADOS DO PROCESSO
 #define NEW '0'
@@ -47,9 +52,19 @@
 // SCHEDULER
 #define NONE 0x0
 #define QUANTUM_COMPLETED 0x2
+#define IO_REQUEST 0x3
 #define SEMAPHORE_BLOCKED 0x4
 #define FINISHED 0x6
 
+// DISCO
+#define DISK_BLOCK(track) ((track) * 521 + 8)
+#define INVERSE_DISK_BLOCK(block) (((block) - 8) / 521)
+#define DISK_BASE_ANGULAR_V (7200)
+#define DISK_TRACK_LIMIT (200)
+#define DISK_OPERATION_TIME (5000)
+#define DISK_TRACK_MOVE_TIME (100)
+
+#define MILLISECONDS_100 (50000000L)
 #define ONE_SECOND_NS (1000000000)
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
 #define MIN(a, b) ((a) >= (b) ? (b) : (a))
@@ -67,6 +82,9 @@ typedef struct segment_table SEGMENT_TABLE;
 
 typedef struct scheduler SCHEDULER;
 typedef struct process_scheduler PROCESS_SCHEDULER;
+
+typedef struct disk_scheduler DISK_SCHEDULER;
+typedef struct disk_request DISK_REQUEST;
 
 typedef struct kernel KERNEL;
 
@@ -135,6 +153,23 @@ struct process_scheduler {
     PROCESS_SCHEDULER *next;
 };
 
+struct disk_scheduler {
+    DISK_REQUEST *head;
+    DISK_REQUEST *tail;
+    DISK_REQUEST *curr;
+    int forward_dir;
+    int curr_track;
+    int angular_v;
+};
+
+struct disk_request {
+    PROCESS *process;
+    int read;
+    int track;
+    int turnaround;
+    DISK_REQUEST *next;
+};
+
 struct scheduler {
     PROCESS_SCHEDULER *head;
     PROCESS_SCHEDULER *tail;
@@ -147,11 +182,14 @@ struct kernel {
     SEGMENT_TABLE segment_table; // <- Tabela de Segmentos
     SEMAPHORE_TABLE semaphore_table; // <- Guarda a tabela de semáforo
     SCHEDULER scheduler;
+    DISK_SCHEDULER disk_scheduler; // <- Guarda as requisições de disco
     int time;
 };
 
 extern KERNEL *kernel;
 extern pthread_mutex_t mutex_scheduler;
+extern pthread_mutex_t mutex_memory;
+extern pthread_mutex_t mutex_disk;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 SEMAPHORE_TABLE semaphore_table_init();
@@ -172,6 +210,21 @@ int count_codes(FILE *fp);
 void process_finish(PROCESS *process);
 PROCESS *find_process(int id);
 void run_process(PROCESS *process);
+// ---------------------------------------------------------------------------------------------
+
+// ---------------------------------- FUNÇÕES ENTRADA/SAIDA ------------------------------------
+void print_request(PROCESS_SCHEDULER *process, int duration);
+// ---------------------------------------------------------------------------------------------
+
+// ------------------------------------ FUNÇÕES DISCO ------------------------------------------
+void disk_init();
+DISK_SCHEDULER disk_scheduler_init();
+void disk_request(PROCESS *process, int track, int flag);
+DISK_REQUEST *create_disk_request();
+void add_disk_request(DISK_REQUEST *new_disk_req);
+void remove_disk_request(DISK_REQUEST *req);
+static void read_write_disk(int track);
+void disk();
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES MEMÓRIA ---------------------------------------
@@ -197,6 +250,7 @@ void print_pcb_processes();
 void print_running_process();
 void print_code(char name[50], char op);
 void print_segment_table();
+void print_disk_usage();
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
@@ -212,5 +266,17 @@ void cpu_init();
 void cpu();
 // ---------------------------------------------------------------------------------------------
 
+// THREADS
+extern pthread_t semP_id;
+extern pthread_t semV_id;
+extern pthread_t interrupt_id;
+extern pthread_t disk_request_id;
+extern pthread_t disk_finish_id;
+extern pthread_t print_request_id;
+extern pthread_t print_finish_id;
+extern pthread_t mem_load_request_id;
+extern pthread_t mem_load_finish_id;
+extern pthread_t process_create_id;
+extern pthread_t process_finish_id;
 
 #endif // SO_H

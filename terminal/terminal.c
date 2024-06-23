@@ -20,16 +20,17 @@ int main_menu() {
         printf("2 - Ver processos em execucao\n");
         printf("3 - Ver estado dos processos\n");
         printf("4 - Ver memoria\n");
+        printf("5 - Ver uso do disco\n");
         printf("0 - Sair\n");
         printf("\nOpcao: ");
         ret = scanf("%d", &op);
 
-        if (ret != 1 || op < 0 || op > 4) {
+        if (ret != 1 || op < 0 || op > 5) {
             printf(ERROR BOLD "OPCAO INVALIDA!\n" LIMPA);
             while (getchar() != '\n')
                 ; // Limpa o buffer do teclado para evitar comportamentos inesperados
         }
-    } while (ret != 1 || op < 0 || op > 4);
+    } while (ret != 1 || op < 0 || op > 5);
 
     return op;
 }
