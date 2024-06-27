@@ -4,8 +4,8 @@ sint1
 1048576
 s t
 
-exec 40
 print 140
+exec 40
 P(s)
 exec 800
 read 45

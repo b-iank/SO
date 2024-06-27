@@ -20,7 +20,7 @@ int main_menu() {
         printf("2 - Ver processos em execucao\n");
         printf("3 - Ver estado dos processos\n");
         printf("4 - Ver memoria\n");
-        printf("5 - Ver uso do disco\n");
+        printf("5 - Ver fila de impressao\n");
         printf("0 - Sair\n");
         printf("\nOpcao: ");
         ret = scanf("%d", &op);

@@ -192,6 +192,8 @@ extern pthread_mutex_t mutex_memory;
 extern pthread_mutex_t mutex_disk;
 extern pthread_mutex_t mutex_create;
 extern pthread_mutex_t mutex_finish;
+extern pthread_mutex_t mutex_semaphore;
+
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 SEMAPHORE_TABLE semaphore_table_init();

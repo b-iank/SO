@@ -7,6 +7,7 @@ pthread_mutex_t mutex_memory;
 pthread_mutex_t mutex_disk;
 pthread_mutex_t mutex_create;
 pthread_mutex_t mutex_finish;
+pthread_mutex_t mutex_semaphore;
 
 pthread_t semP_id;
 pthread_t semV_id;
@@ -312,7 +313,7 @@ PROCESS *find_process(int id) {
 void run_process(PROCESS *process) {
     int a;
     pthread_mutex_lock(&mutex_memory);
-    if (a = find_segment(process->segment_id) != -1) {
+    if ((a = find_segment(process->segment_id)) != -1) {
         SEGMENT *segment = &kernel->segment_table.segments[a];
         if (segment->qnt_page_memory < segment->qnt_page) {
             int request = MEMORY_PAGE_SIZE * (segment->qnt_page - segment->qnt_page_memory);
@@ -320,9 +321,9 @@ void run_process(PROCESS *process) {
             load_memory_page(segment, request);
         }
         pthread_mutex_unlock(&mutex_memory);
-
-        if (process->pc > process->qnt_code)
+        if (process->pc >= process->qnt_code || process->remaining_time <= 0)
             return;
+
         CODE *code = &process->code[process->pc];
         if (print && code)
             print_code(process->name, code->op); // chegou aqui na execução
@@ -330,7 +331,7 @@ void run_process(PROCESS *process) {
             case EXEC: {
                 if (process->remaining_time < code->value) {
                     code->value = code->value - process->remaining_time;
-                    interrupt_control(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+                    process->remaining_time = 0;
                 } else {
                     process->remaining_time = process->remaining_time - code->value;
                     process->pc++;
@@ -368,6 +369,7 @@ void run_process(PROCESS *process) {
                 sys_call(SEMAPHORE_V, find_semaphore(code->sem));
                 process->remaining_time = MAX(0, process->remaining_time - 200);
                 kernel->time += 200;
+
                 break;
             }
             default:
@@ -387,15 +389,15 @@ void print_request(ARGS *args) {
         kernel->printing_queue = malloc(sizeof(char *) * 10);
     }
 
-    kernel->print++; // 8
-    int quant = kernel->print; // 8
+    kernel->print++; //
+    int quant = kernel->print; //
     if (kernel->print > PRINTING_LIMIT) {
         free(kernel->printing_queue[0]);
 
-        for (int i = 0; i < quant - 2; i++) { //0 ... 10
+        for (int i = 0; i < quant - 2; i++) { //
             kernel->printing_queue[i] = kernel->printing_queue[i+1];
         }
-        kernel->print--; // 10
+        kernel->print--; //
         quant--;
     }
     else {
@@ -594,7 +596,7 @@ void memory_load_request(PROCESS *process) {
 }
 
 void memory_load_finish (PROCESS *process) {
-    pthread_mutex_lock(&mutex_create); // TODO: ou igual antes? ..
+    pthread_mutex_lock(&mutex_create); //
     kernel->pcb = add_process(process);
 
     kernel->scheduler = add_process_scheduler(process);
@@ -603,7 +605,7 @@ void memory_load_finish (PROCESS *process) {
     interrupt_control(PROCESS_INTERRUPT, NONE);
 
     so_define(1, "Processo criado!");
-    pthread_mutex_unlock(&mutex_create); // aqui?
+    pthread_mutex_unlock(&mutex_create); //
 }
 
 void page_request(PROCESS *process, SEGMENT *segment, int request) {
@@ -779,7 +781,10 @@ void schedule_process(int flag) {
         new->process->remaining_time = new->process->max_time;
     }
 
-    if (new) {
+    if (new && new->process->state != READY && scheduled->process->state == READY) {
+        scheduled->process->state = RUNNING;
+    }
+    else if (new) {
         new->process->state = RUNNING;
         scheduler->scheduled = new;
     }
@@ -838,9 +843,9 @@ void print_running_process() {
     CLEAR;
     printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
     if (kernel->scheduler.scheduled) {
-        printf("\n┌────────────┬──────────┐\n");
-        printf("│ %-10s │ %-8s │\n", "Nome", "Operacao");
-        printf("├────────────┼──────────┤\n");
+        printf("\n┌────────────────────────────────┬──────────┐\n");
+        printf("│ %-30s │ %-8s │\n", "Nome", "Operacao");
+        printf("├────────────────────────────────┼──────────┤\n");
         print = 1;
     } else {
         so_alert("┌────────────────────────────────────────────┐");
@@ -878,7 +883,7 @@ void print_code(char name[50], char op) {
         default:
             break;
     }
-    printf("│ %-10s │ %-8s │\n", name, op_str);
+    printf("│ %-30s │ %-8s │\n", name, op_str);
 }
 
 void print_segment_table() {
@@ -914,11 +919,11 @@ void print_printing_queue() {
 
     CLEAR;
     if (quant && table) {
-        printf("┌────────────────────────────┐\n");
-        printf("│ %-26s │\n", "FILA DE IMPRESSAO");
-        printf("├───────┬────────────────────┤\n");
+        printf("┌──────────────────────────────────────────────────────────────────────────────────────────┐\n");
+        printf("│ %-88s │\n", "FILA DE IMPRESSAO");
+        printf("├──────────────────────────────────────────────────────────────────────────────────────────┤\n");
         for (int i = 0; i < quant; i++)
-            printf("│ %-38s │\n", table[i]);
+            printf("│ %-88s │\n", table[i]);
     } else {
         so_alert("┌────────────────────────────────────────────┐");
         so_alert("│     FILA DE IMPRESSAO VAZIA NO MOMENTO     │");
@@ -956,8 +961,7 @@ KERNEL *kernel_init() {
 void sys_call(char function, void *arg) {
     switch (function) {
         case PROCESS_CREATE: {
-            pthread_create(&process_create_id, NULL, (void *) process_create, (char *) arg);
-            //pthread_join(process_create_id, NULL);
+            process_create((char *) arg);
             break;
         }
         case MEMORY_LOAD_REQUEST: {
@@ -966,15 +970,22 @@ void sys_call(char function, void *arg) {
             pthread_create(&mem_load_request_id, NULL, (void *)memory_load_request, (PROCESS *) arg);
             interrupt_control(MEMORY_LOAD_FINISH, (PROCESS *) arg);
 
+//            pthread_join(mem_load_request_id, NULL);
+//            pthread_join(mem_load_finish_id, NULL);
+            // pthread_detach();
             pthread_mutex_unlock(&mutex_create);
             break;
         }
         case SEMAPHORE_P: {
-            P((SEMAPHORE *) arg);
+            pthread_mutex_lock(&mutex_semaphore);
+            pthread_create(&semP_id, NULL, (void *)P, (PROCESS *) arg);
+            pthread_mutex_unlock(&mutex_semaphore);
             break;
         }
         case SEMAPHORE_V: {
-            V((SEMAPHORE *) arg);
+            pthread_mutex_lock(&mutex_semaphore);
+            pthread_create(&semV_id, NULL, (void *)V, (PROCESS *) arg);
+            pthread_mutex_unlock(&mutex_semaphore);
             break;
         }
         case DISK_READ_REQUEST: {
@@ -1085,6 +1096,7 @@ void cpu_init() {
     pthread_mutex_init(&mutex_disk, NULL);
     pthread_mutex_init(&mutex_create, NULL);
     pthread_mutex_init(&mutex_finish, NULL);
+    pthread_mutex_init(&mutex_semaphore, NULL);
 
     pthread_attr_init(&cpu_attr);
     pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
@@ -1110,7 +1122,9 @@ _Noreturn void cpu() {
             interrupt_control(PROCESS_INTERRUPT, NONE);
             pthread_mutex_unlock(&mutex_create);
         } else {
-            do {
+            while (kernel->scheduler.scheduled != NULL && kernel->scheduler.scheduled->process->remaining_time > 0 &&
+                   kernel->scheduler.scheduled->process->pc < kernel->scheduler.scheduled->process->qnt_code)
+            {
                 clock_gettime(CLOCK_REALTIME, &end);
                 elapsed = difftime(end.tv_sec, start.tv_sec) + (double) (end.tv_nsec - start.tv_nsec) / ONE_SECOND_NS;
 
@@ -1122,8 +1136,7 @@ _Noreturn void cpu() {
                 }
                 pthread_mutex_unlock(&mutex_create);
                 pthread_mutex_unlock(&mutex_finish);
-            } while (kernel->scheduler.scheduled != NULL && kernel->scheduler.scheduled->process->remaining_time > 0 &&
-                     kernel->scheduler.scheduled->process->pc < kernel->scheduler.scheduled->process->qnt_code);
+            }
 
             pthread_mutex_lock(&mutex_create);
             if (kernel->scheduler.scheduled == NULL) {
