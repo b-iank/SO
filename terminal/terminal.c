@@ -1,7 +1,7 @@
 #include "terminal.h"
 
 int status_message;
-char str_message[255];
+char str_message[305];
 
 int main_menu() {
     int op = -1, ret;

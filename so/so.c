@@ -100,7 +100,7 @@ void V(SEMAPHORE *semaphore) {
     if (semaphore->S <= 0 && semaphore->qnt_blocked > 0) {
         semaphore->qnt_blocked--;
         int id = semaphore->id_blocked[0];
-        for (int i = 0; i < semaphore->qnt_blocked; i++) // 4
+        for (int i = 0; i < semaphore->qnt_blocked; i++)
             semaphore->id_blocked[i] = semaphore->id_blocked[i + 1];
         PROCESS *blocked = find_process(id);
         if (!blocked)
@@ -224,7 +224,7 @@ PROCESS *read_synthetic_program(FILE *fp) {
 
         if (op[0] == 'P' || op[0] == 'V') {
             if (!semaphore_process_exists(op[2], process)) {
-                char error_msg[255];
+                char error_msg[305];
                 sprintf(error_msg, "O semaphores %c nao existe - Processo %s nao criado", op[2], name);
                 so_define(3, error_msg);
                 free(code);
@@ -249,7 +249,7 @@ PROCESS *read_synthetic_program(FILE *fp) {
             else if (strcmp(left_op, "print") == 0)
                 code[i].op = PRINT;
             else {
-                char error_msg[255];
+                char error_msg[305];
                 sprintf(error_msg, "Operacao %s invalida - Processo %s nao criado", left_op, name);
                 so_define(3, error_msg);
                 free(code);
@@ -924,6 +924,7 @@ void print_printing_queue() {
         printf("├──────────────────────────────────────────────────────────────────────────────────────────┤\n");
         for (int i = 0; i < quant; i++)
             printf("│ %-88s │\n", table[i]);
+        printf("└──────────────────────────────────────────────────────────────────────────────────────────┘");
     } else {
         so_alert("┌────────────────────────────────────────────┐");
         so_alert("│     FILA DE IMPRESSAO VAZIA NO MOMENTO     │");
@@ -1073,7 +1074,7 @@ void interrupt_control(char function, void *arg) {
             break;
         }
         default: {
-            char error_msg[255];
+            char error_msg[305];
             sprintf(error_msg, "O process %c nao esta definido", function);
             so_define(2, error_msg);
         }
