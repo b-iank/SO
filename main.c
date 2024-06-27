@@ -36,7 +36,7 @@ void screen() {
         else if (op == 4)
             print_segment_table();
         else if (op == 5)
-            print_disk_usage();
+            print_printing_queue();
         else
             so_sucess("Adeus Aleardo :D");
     } while (op != 0);

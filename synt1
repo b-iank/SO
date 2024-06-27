@@ -5,6 +5,7 @@ sint1
 s t
 
 exec 40
+print 140
 P(s)
 exec 800
 read 45

@@ -3,9 +3,10 @@
 #include <math.h>
 #include <unistd.h>
 
-pthread_mutex_t mutex_scheduler;
 pthread_mutex_t mutex_memory;
 pthread_mutex_t mutex_disk;
+pthread_mutex_t mutex_create;
+pthread_mutex_t mutex_finish;
 
 pthread_t semP_id;
 pthread_t semV_id;
@@ -78,8 +79,9 @@ int semaphore_process_exists(char semaphore_name, PROCESS *process) {
     return 0;
 }
 
-void P(SEMAPHORE *semaphore, PROCESS *process) {
-    // sem_wait(&semaphores->mutex);
+void P(SEMAPHORE *semaphore) {
+    PROCESS *process = kernel->scheduler.scheduled->process;
+
     semaphore->S--;
     if (semaphore->S < 0) {
         semaphore->id_blocked = (int *) realloc(semaphore->id_blocked, (++semaphore->qnt_blocked * sizeof(int)));
@@ -90,23 +92,20 @@ void P(SEMAPHORE *semaphore, PROCESS *process) {
         semaphore->id_blocked[semaphore->qnt_blocked - 1] = process->id;
         process_sleep();
     }
-    // sem_post(&semaphores->mutex);
 }
 
 void V(SEMAPHORE *semaphore) {
-    // sem_wait(&semaphores->mutex);
     semaphore->S++;
     if (semaphore->S <= 0 && semaphore->qnt_blocked > 0) {
         semaphore->qnt_blocked--;
         int id = semaphore->id_blocked[0];
-        for (int i = 0; i < semaphore->qnt_blocked; i++)
+        for (int i = 0; i < semaphore->qnt_blocked; i++) // 4
             semaphore->id_blocked[i] = semaphore->id_blocked[i + 1];
         PROCESS *blocked = find_process(id);
         if (!blocked)
             return;
         process_wakeup(blocked);
     }
-    // sem_post(&semaphores->mutex);
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -285,15 +284,15 @@ int count_codes(FILE *fp) {
 }
 
 void process_finish(PROCESS *process) {
-    if (process) {
-        pthread_mutex_lock(&mutex_scheduler);
+    if (process && process->state != DONE) {
         interrupt_control(PROCESS_INTERRUPT, (void *) FINISHED);
 
+        pthread_mutex_lock(&mutex_memory);
         segment_free(process->segment_id, process->id);
         remove_scheduler(process);
-        pthread_mutex_unlock(&mutex_scheduler);
 
         free(process->code);
+        pthread_mutex_unlock(&mutex_memory);
     }
 }
 
@@ -311,61 +310,102 @@ PROCESS *find_process(int id) {
 }
 
 void run_process(PROCESS *process) {
+    int a;
     pthread_mutex_lock(&mutex_memory);
-    SEGMENT *segment = &kernel->segment_table.segments[find_segment(process->segment_id)];
-    if (segment->qnt_page_memory < segment->qnt_page) {
-        int request = MEMORY_PAGE_SIZE * (segment->qnt_page - segment->qnt_page_memory);
-        page_request(process, segment, request);
-        load_memory_page(segment, request);
-    }
-    pthread_mutex_unlock(&mutex_memory);
+    if (a = find_segment(process->segment_id) != -1) {
+        SEGMENT *segment = &kernel->segment_table.segments[a];
+        if (segment->qnt_page_memory < segment->qnt_page) {
+            int request = MEMORY_PAGE_SIZE * (segment->qnt_page - segment->qnt_page_memory);
+            page_request(process, segment, request);
+            load_memory_page(segment, request);
+        }
+        pthread_mutex_unlock(&mutex_memory);
 
-    CODE *code = &process->code[process->pc];
-    if (print)
-        print_code(process->name, code->op); // chegou aqui na execução
-    switch (code->op) {
-        case EXEC: {
-            if (process->remaining_time < code->value) {
-                code->value = code->value - process->remaining_time;
-                interrupt_control(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
-            } else {
-                process->remaining_time = process->remaining_time - code->value;
-                process->pc++;
+        if (process->pc > process->qnt_code)
+            return;
+        CODE *code = &process->code[process->pc];
+        if (print && code)
+            print_code(process->name, code->op); // chegou aqui na execução
+        switch (code->op) {
+            case EXEC: {
+                if (process->remaining_time < code->value) {
+                    code->value = code->value - process->remaining_time;
+                    interrupt_control(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+                } else {
+                    process->remaining_time = process->remaining_time - code->value;
+                    process->pc++;
+                }
+                kernel->time += code->value;
+                break;
             }
-            kernel->time += code->value;
-            break;
-        }
-        case READ: {
-            sys_call(DISK_READ_REQUEST, (void *) code->value);
-            break;
-        }
-        case WRITE: {
-            sys_call(DISK_WRITE_REQUEST, (void *) code->value);
-            break;
-        }
-        case PRINT: {
-            sys_call(PRINT_REQUEST, (void *) code->value);
-            break;
-        }
-        case SEM_P: {
-            sys_call(SEMAPHORE_P, find_semaphore(code->sem));
+            case READ: {
+                process->pc++;
+                sys_call(DISK_READ_REQUEST, (void *) code->value);
+                break;
+            }
+            case WRITE: {
+                process->pc++;
+                sys_call(DISK_WRITE_REQUEST, (void *) code->value);
+                break;
+            }
+            case PRINT: {
+                process->pc++;
+                sys_call(PRINT_REQUEST, (void *) code->value);
+                break;
+            }
+            case SEM_P: {
+                process->pc++;
+                sys_call(SEMAPHORE_P, find_semaphore(code->sem));
 
-            if (process->state != BLOCKED)
+                if (process->state != BLOCKED)
+                    process->remaining_time = MAX(0, process->remaining_time - 200);
+
+                kernel->time += 200;
+                break;
+            }
+            case SEM_V: {
+                process->pc++;
+                sys_call(SEMAPHORE_V, find_semaphore(code->sem));
                 process->remaining_time = MAX(0, process->remaining_time - 200);
-            process->pc++;
-            kernel->time += 200;
-            break;
+                kernel->time += 200;
+                break;
+            }
+            default:
+                process->pc++;
         }
-        case SEM_V: {
-            sys_call(SEMAPHORE_V, find_semaphore(code->sem));
-            process->remaining_time = MAX(0, process->remaining_time - 200);
-            process->pc++;
-            kernel->time += 200;
-            break;
-        }
-        default:
-            process->pc++;
     }
+    else {
+        pthread_mutex_unlock(&mutex_memory);
+    }
+}
+
+// ---------------------------------- FUNÇÕES ENTRADA E SAIDA --------------------------------------
+void print_request(ARGS *args) {
+    PROCESS* process = args->args1;
+    int *duration = (int *) args->args2;
+    if (!kernel->printing_queue) {
+        kernel->printing_queue = malloc(sizeof(char *) * 10);
+    }
+
+    kernel->print++; // 8
+    int quant = kernel->print; // 8
+    if (kernel->print > PRINTING_LIMIT) {
+        free(kernel->printing_queue[0]);
+
+        for (int i = 0; i < quant - 2; i++) { //0 ... 10
+            kernel->printing_queue[i] = kernel->printing_queue[i+1];
+        }
+        kernel->print--; // 10
+        quant--;
+    }
+    else {
+        kernel->printing_queue[quant-1] = malloc(sizeof(char) * 100);
+    }
+    sprintf(kernel->printing_queue[quant-1], "Process '%s' imprimiu por %d u.t.", process->name, *duration);
+}
+
+void print_finish (PROCESS *process) {
+    process_wakeup(process);
 }
 
 // ------------------------------------- FUNÇÕES DISCO -----------------------------------------
@@ -382,41 +422,27 @@ void disk_init() {
 DISK_SCHEDULER disk_scheduler_init() {
     DISK_SCHEDULER disk_scheduler;
     disk_scheduler.head = NULL;
-    disk_scheduler.tail = NULL;
-    disk_scheduler.curr = NULL;
     disk_scheduler.forward_dir = 1;
     disk_scheduler.curr_track = 0;
     return disk_scheduler;
 }
 
-void disk_request(PROCESS* process, int track, int read) {
-    int time = DISK_OPERATION_TIME;
-    DISK_SCHEDULER *disk_scheduler = &kernel->disk_scheduler;
-    if (disk_scheduler->forward_dir) {
-        if (track >= disk_scheduler->curr_track)
-            time += (track - disk_scheduler->curr_track) * DISK_TRACK_MOVE_TIME;
-        else
-            time += ((DISK_TRACK_LIMIT - disk_scheduler->curr_track)
-                     + (DISK_TRACK_LIMIT - track))
-                    * DISK_TRACK_MOVE_TIME;
-    }
-    else {
-        if (track < disk_scheduler->curr_track)
-            time += (disk_scheduler->curr_track - track) * DISK_TRACK_MOVE_TIME;
-        else
-            time += (disk_scheduler->curr_track + track) * DISK_TRACK_MOVE_TIME;
-    }
+void disk_request(ARGS *args) {
+    PROCESS* process = args->args1;
+    int *track = (int *) args->args2;
+    int *read = (int *) args->args3;
 
     DISK_REQUEST * disk_req = create_disk_request();
     disk_req->process = process;
-    disk_req->track = track;
-    disk_req->read = read;
-    disk_req->turnaround = time;
+    disk_req->track = *track;
+    disk_req->read = *read;
     disk_req->next = NULL;
 
     add_disk_request(disk_req);
-    int aux = process->remaining_time - time;
-    process->remaining_time = aux >= 0 ? aux : 0;
+}
+
+void disk_finish (PROCESS *process) {
+    process_wakeup(process);
 }
 
 DISK_REQUEST * create_disk_request() {
@@ -486,13 +512,16 @@ static void read_write_disk(int track) {
         DISK_REQUEST * disk_req = (DISK_REQUEST *) aux;
 
         if (disk_req->track == track) {
+            pthread_mutex_lock(&mutex_create);
             interrupt_control(DISK_FINISH, disk_req->process);
+            pthread_mutex_unlock(&mutex_create);
 
             remove_disk_request(aux);
         }
 
         aux = next_node;
     }
+    // pthread_join(disk_finish_id, NULL);
 }
 
 _Noreturn void disk() {
@@ -508,24 +537,25 @@ _Noreturn void disk() {
         if (elapsed >= MILLISECONDS_100) {
             start = end;
 
-            pthread_mutex_lock(&mutex_disk);
-            read_write_disk(kernel->disk_scheduler.curr_track);
+            if (kernel->disk_scheduler.head){
+                pthread_mutex_lock(&mutex_disk);
+                read_write_disk(kernel->disk_scheduler.curr_track); // enquanto head == NULL nao faz nada
+                pthread_mutex_unlock(&mutex_disk);
 
-            if (kernel->disk_scheduler.forward_dir) {
-                if (kernel->disk_scheduler.curr_track == DISK_TRACK_LIMIT)
-                    kernel->disk_scheduler.forward_dir = 0;
-                else
-                    kernel->disk_scheduler.curr_track++;
-            } else {
-                if (kernel->disk_scheduler.curr_track == 0)
-                    kernel->disk_scheduler.forward_dir = 1;
-                else
-                    kernel->disk_scheduler.curr_track--;
+                pthread_mutex_lock(&mutex_disk);
+                if (kernel->disk_scheduler.forward_dir) {
+                    if (kernel->disk_scheduler.curr_track == DISK_TRACK_LIMIT)
+                        kernel->disk_scheduler.forward_dir = 0;
+                    else
+                        kernel->disk_scheduler.curr_track++;
+                } else {
+                    if (kernel->disk_scheduler.curr_track == 0)
+                        kernel->disk_scheduler.forward_dir = 1;
+                    else
+                        kernel->disk_scheduler.curr_track--;
+                }
+                pthread_mutex_unlock(&mutex_disk);
             }
-
-            kernel->disk_scheduler.angular_v = (int) (DISK_BASE_ANGULAR_V + 100 * sin(kernel->disk_scheduler.curr_track));
-
-            pthread_mutex_unlock(&mutex_disk);
         }
     }
 }
@@ -549,8 +579,7 @@ void load_memory_page(SEGMENT *segment, int request) {
 }
 
 void memory_load_request(PROCESS *process) {
-    pthread_mutex_lock(&mutex_memory);
-
+    pthread_mutex_lock(&mutex_memory); // ESSE
     if (find_segment(process->segment_id) == -1) { // Segmento não existe -> cria
         SEGMENT *segment = malloc(sizeof(SEGMENT));
         segment->id = process->segment_id;
@@ -562,6 +591,19 @@ void memory_load_request(PROCESS *process) {
         add_segment_table(segment);
     }
     pthread_mutex_unlock(&mutex_memory);
+}
+
+void memory_load_finish (PROCESS *process) {
+    pthread_mutex_lock(&mutex_create); // TODO: ou igual antes? ..
+    kernel->pcb = add_process(process);
+
+    kernel->scheduler = add_process_scheduler(process);
+
+    process->state = READY;
+    interrupt_control(PROCESS_INTERRUPT, NONE);
+
+    so_define(1, "Processo criado!");
+    pthread_mutex_unlock(&mutex_create); // aqui?
 }
 
 void page_request(PROCESS *process, SEGMENT *segment, int request) {
@@ -633,7 +675,7 @@ void segment_free(int segment_id, int process_id) {
         for (; index < qnt - 1; index++)
             segment_table->segments[index] = segment_table->segments[index + 1];
 
-        // Realoca a tabela de segments para quantidade - 1
+        // Realoca a tabela de segments para quantidade - 1 HERE
         segment_table->segments = (SEGMENT *) realloc(segment_table->segments, sizeof(SEGMENT) * (qnt - 1));
         if (!segment_table->segments && segment_table->qnt_segments != 0) {
             so_error("Erro de memoria");
@@ -708,9 +750,9 @@ SCHEDULER add_process_scheduler(PROCESS *process) {
     return scheduler;
 }
 
-SCHEDULER schedule_process(int flag) {
-    SCHEDULER scheduler = kernel->scheduler;
-    PROCESS_SCHEDULER *scheduled = scheduler.scheduled, *new = NULL;
+void schedule_process(int flag) {
+    SCHEDULER *scheduler = &kernel->scheduler;
+    PROCESS_SCHEDULER *scheduled = scheduler->scheduled, *new = NULL;
 
     PROCESS_SCHEDULER *aux = NULL;
     if (scheduled)
@@ -732,15 +774,15 @@ SCHEDULER schedule_process(int flag) {
                 new = NULL;
         } else // QUANTUM COMPLETED OU NONE
             scheduled->process->state = READY;
-    } else if (scheduler.head) {
-        new = scheduler.head;
+    } else if (scheduler->head) {
+        new = scheduler->head;
         new->process->remaining_time = new->process->max_time;
     }
 
-    if (new)
+    if (new) {
         new->process->state = RUNNING;
-    scheduler.scheduled = new;
-    return scheduler;
+        scheduler->scheduled = new;
+    }
 }
 
 void remove_scheduler(PROCESS *process) {
@@ -833,6 +875,8 @@ void print_code(char name[50], char op) {
         case PRINT:
             strcpy(op_str, "PRINT");
             break;
+        default:
+            break;
     }
     printf("│ %-10s │ %-8s │\n", name, op_str);
 }
@@ -863,8 +907,28 @@ void print_segment_table() {
         ;
 }
 
-void print_disk_usage() {
-    return;
+void print_printing_queue() {
+    char **table = kernel->printing_queue;
+    int quant = kernel->print;
+    char next;
+
+    CLEAR;
+    if (quant && table) {
+        printf("┌────────────────────────────┐\n");
+        printf("│ %-26s │\n", "FILA DE IMPRESSAO");
+        printf("├───────┬────────────────────┤\n");
+        for (int i = 0; i < quant; i++)
+            printf("│ %-38s │\n", table[i]);
+    } else {
+        so_alert("┌────────────────────────────────────────────┐");
+        so_alert("│     FILA DE IMPRESSAO VAZIA NO MOMENTO     │");
+        so_alert("└────────────────────────────────────────────┘");
+    }
+
+    printf("PRESSIONE ENTER PARA PROSSEGUIR\n");
+    scanf("%c", &next);
+    while (!getchar())
+        ;
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -884,26 +948,29 @@ KERNEL *kernel_init() {
     kernel->scheduler = scheduler_init();
     kernel->semaphore_table = semaphore_table_init();
     kernel->disk_scheduler = disk_scheduler_init();
+    kernel->printing_queue = NULL;
+    kernel->print = 0;
     return kernel;
 }
 
 void sys_call(char function, void *arg) {
     switch (function) {
         case PROCESS_CREATE: {
-            process_create((char *) arg);
-            break;
-        }
-        case PROCESS_FINISH: {
-            process_finish((PROCESS *) arg);
+            pthread_create(&process_create_id, NULL, (void *) process_create, (char *) arg);
+            //pthread_join(process_create_id, NULL);
             break;
         }
         case MEMORY_LOAD_REQUEST: {
-            memory_load_request((PROCESS *) arg);
+            pthread_mutex_lock(&mutex_create);
+
+            pthread_create(&mem_load_request_id, NULL, (void *)memory_load_request, (PROCESS *) arg);
             interrupt_control(MEMORY_LOAD_FINISH, (PROCESS *) arg);
+
+            pthread_mutex_unlock(&mutex_create);
             break;
         }
         case SEMAPHORE_P: {
-            P((SEMAPHORE *) arg, kernel->scheduler.scheduled->process);
+            P((SEMAPHORE *) arg);
             break;
         }
         case SEMAPHORE_V: {
@@ -911,33 +978,55 @@ void sys_call(char function, void *arg) {
             break;
         }
         case DISK_READ_REQUEST: {
-            const int track = (int)arg;
+            int track = (int) arg;
             PROCESS_SCHEDULER *process = kernel->scheduler.scheduled;
 
-            schedule_process(IO_REQUEST);
+            interrupt_control(PROCESS_INTERRUPT, (void *) IO_REQUEST);
 
             pthread_mutex_lock(&mutex_disk);
-            disk_request(process->process, track, 1);
+            int aux = 1;
+            ARGS *args = malloc(sizeof(ARGS));
+            args->args1 = process->process;
+            args->args2 = &track;
+            args->args3 = &aux;
+
+            pthread_create(&disk_request_id, NULL, (void *) disk_request, (void *) args);
             pthread_mutex_unlock(&mutex_disk);
             break;
         }
         case DISK_WRITE_REQUEST: {
-            const int track = (int) arg;
-            PROCESS_SCHEDULER *process = kernel->scheduler.scheduled;
+            int track = (int) arg;
+            PROCESS *process = kernel->scheduler.scheduled->process;
 
-            schedule_process(IO_REQUEST);
+            interrupt_control(PROCESS_INTERRUPT, (void *) IO_REQUEST);
 
             pthread_mutex_lock(&mutex_disk);
-            disk_request(process->process, track, 0);
+            int aux = 0;
+            ARGS *args = malloc(sizeof(ARGS));
+            args->args1 = process;
+            args->args2 = &track;
+            args->args3 = &aux;
+
+            pthread_create(&disk_request_id, NULL, (void *) disk_request, (void *) args);
+            //pthread_join(disk_request_id, NULL);
             pthread_mutex_unlock(&mutex_disk);
             break;
         }
         case PRINT_REQUEST: {
-            PROCESS_SCHEDULER *process = kernel->scheduler.scheduled;
+            PROCESS *process = kernel->scheduler.scheduled->process;
 
-            kernel->scheduler = schedule_process(IO_REQUEST);
+            interrupt_control(PROCESS_INTERRUPT, (void *) IO_REQUEST);
 
+            pthread_mutex_unlock(&mutex_create);
+            int aux = (int) arg;
+            ARGS *args = malloc(sizeof(ARGS));
+            args->args1 = process;
+            args->args2 = &aux;
+
+            pthread_create(&print_request_id, NULL, (void *) print_request, (void *) args);
             interrupt_control(PRINT_FINISH, process);
+            //pthread_join(print_request_id, NULL);
+            pthread_mutex_lock(&mutex_create);
             break;
         }
         default: { // delete(System32);
@@ -949,33 +1038,27 @@ void sys_call(char function, void *arg) {
 void interrupt_control(char function, void *arg) {
     switch (function) {
         case PROCESS_INTERRUPT: {
-            kernel->scheduler = schedule_process((int) arg);
+            schedule_process((int) arg);
+            break;
+        }
+        case PROCESS_FINISH: {
+            pthread_create(&process_finish_id, NULL, (void *) process_finish, (PROCESS *) arg);
+            //pthread_join(process_finish_id, NULL);
             break;
         }
         case MEMORY_LOAD_FINISH: {
-            PROCESS *process = (PROCESS *) arg;
-
-            kernel->pcb = add_process(process);
-            process->state = READY;
-
-            pthread_mutex_lock(&mutex_scheduler);
-
-            kernel->scheduler = add_process_scheduler(process);
-
-            interrupt_control(PROCESS_INTERRUPT, NONE);
-
-            pthread_mutex_unlock(&mutex_scheduler);
-            so_define(1, "Processo criado!");
+            pthread_create(&mem_load_finish_id, NULL, (void *) memory_load_finish, (PROCESS *) arg);
+            //pthread_join(mem_load_finish_id, NULL);
             break;
         }
         case DISK_FINISH: {
-            PROCESS_SCHEDULER *processScheduler = (PROCESS_SCHEDULER *) arg;
-            process_wakeup(processScheduler->process);
+            pthread_create(&disk_finish_id, NULL, (void *)disk_finish, (PROCESS *)arg);
+            //pthread_join(disk_finish_id, NULL);
             break;
         }
         case PRINT_FINISH: {
-            PROCESS_SCHEDULER *processScheduler = (PROCESS_SCHEDULER *) arg;
-            process_wakeup(processScheduler->process);
+            pthread_create(&print_finish_id, NULL, (void *)print_finish, (PROCESS *) arg);
+            //pthread_join(print_finish_id, NULL);
             break;
         }
         default: {
@@ -986,19 +1069,22 @@ void interrupt_control(char function, void *arg) {
     }
 }
 
-void process_sleep() { interrupt_control(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED); }
+void process_sleep() {
+    interrupt_control(PROCESS_INTERRUPT, (void *) SEMAPHORE_BLOCKED);
+}
 
 void process_wakeup(PROCESS *processo) { processo->state = READY; }
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES CPU -------------------------------------------
 void cpu_init() {
-    // init_threads();
     pthread_t cpu_id;
     pthread_attr_t cpu_attr;
 
-    pthread_mutex_init(&mutex_scheduler, NULL);
     pthread_mutex_init(&mutex_memory, NULL);
+    pthread_mutex_init(&mutex_disk, NULL);
+    pthread_mutex_init(&mutex_create, NULL);
+    pthread_mutex_init(&mutex_finish, NULL);
 
     pthread_attr_init(&cpu_attr);
     pthread_attr_setscope(&cpu_attr, PTHREAD_SCOPE_SYSTEM);
@@ -1020,33 +1106,38 @@ _Noreturn void cpu() {
         if (!kernel->scheduler.head)
             continue;
         else if (!kernel->scheduler.scheduled) {
-            pthread_mutex_lock(&mutex_scheduler);
-            kernel->scheduler = schedule_process(NONE);
-            pthread_mutex_unlock(&mutex_scheduler);
+            pthread_mutex_lock(&mutex_create);
+            interrupt_control(PROCESS_INTERRUPT, NONE);
+            pthread_mutex_unlock(&mutex_create);
         } else {
             do {
                 clock_gettime(CLOCK_REALTIME, &end);
                 elapsed = difftime(end.tv_sec, start.tv_sec) + (double) (end.tv_nsec - start.tv_nsec) / ONE_SECOND_NS;
 
+                pthread_mutex_lock(&mutex_finish);
+                pthread_mutex_lock(&mutex_create);
                 if (elapsed >= 0.75) {
                     start = end;
-                    pthread_mutex_lock(&mutex_scheduler);
                     run_process(kernel->scheduler.scheduled->process);
-                    pthread_mutex_unlock(&mutex_scheduler);
                 }
+                pthread_mutex_unlock(&mutex_create);
+                pthread_mutex_unlock(&mutex_finish);
             } while (kernel->scheduler.scheduled != NULL && kernel->scheduler.scheduled->process->remaining_time > 0 &&
                      kernel->scheduler.scheduled->process->pc < kernel->scheduler.scheduled->process->qnt_code);
 
-            if (kernel->scheduler.scheduled == NULL)
+            pthread_mutex_lock(&mutex_create);
+            if (kernel->scheduler.scheduled == NULL) {
                 continue;
-
-            if (kernel->scheduler.scheduled->process->pc >= kernel->scheduler.scheduled->process->qnt_code) {
-                sys_call(PROCESS_FINISH, (void *) kernel->scheduler.scheduled->process);
-            } else {
-                pthread_mutex_lock(&mutex_scheduler);
-                interrupt_control(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
-                pthread_mutex_unlock(&mutex_scheduler);
             }
+
+            pthread_mutex_lock(&mutex_finish);
+            if (kernel->scheduler.scheduled->process->pc >= kernel->scheduler.scheduled->process->qnt_code) {
+                interrupt_control(PROCESS_FINISH, (void *) kernel->scheduler.scheduled->process);
+            } else {
+                interrupt_control(PROCESS_INTERRUPT, (void *) QUANTUM_COMPLETED);
+            }
+            pthread_mutex_unlock(&mutex_finish);
+            pthread_mutex_unlock(&mutex_create);
         }
     }
 }

@@ -12,6 +12,7 @@
 #define CLEAR system("clear");
 
 #define MAX_SEMAPHORE 10
+#define PRINTING_LIMIT 10
 
 #define MAX_PROCESS_NAME 50
 #define QUANTUM_TIME 5000
@@ -57,12 +58,7 @@
 #define FINISHED 0x6
 
 // DISCO
-#define DISK_BLOCK(track) ((track) * 521 + 8)
-#define INVERSE_DISK_BLOCK(block) (((block) - 8) / 521)
-#define DISK_BASE_ANGULAR_V (7200)
 #define DISK_TRACK_LIMIT (200)
-#define DISK_OPERATION_TIME (5000)
-#define DISK_TRACK_MOVE_TIME (100)
 
 #define MILLISECONDS_100 (50000000L)
 #define ONE_SECOND_NS (1000000000)
@@ -87,6 +83,7 @@ typedef struct disk_scheduler DISK_SCHEDULER;
 typedef struct disk_request DISK_REQUEST;
 
 typedef struct kernel KERNEL;
+typedef struct args ARGS;
 
 struct semaphore {
     char name;
@@ -155,18 +152,14 @@ struct process_scheduler {
 
 struct disk_scheduler {
     DISK_REQUEST *head;
-    DISK_REQUEST *tail;
-    DISK_REQUEST *curr;
     int forward_dir;
     int curr_track;
-    int angular_v;
 };
 
 struct disk_request {
     PROCESS *process;
     int read;
     int track;
-    int turnaround;
     DISK_REQUEST *next;
 };
 
@@ -183,13 +176,22 @@ struct kernel {
     SEMAPHORE_TABLE semaphore_table; // <- Guarda a tabela de semáforo
     SCHEDULER scheduler;
     DISK_SCHEDULER disk_scheduler; // <- Guarda as requisições de disco
+    char **printing_queue;
+    int print;
     int time;
 };
 
+struct args {
+    void *args1;
+    void *args2;
+    void *args3;
+};
+
 extern KERNEL *kernel;
-extern pthread_mutex_t mutex_scheduler;
 extern pthread_mutex_t mutex_memory;
 extern pthread_mutex_t mutex_disk;
+extern pthread_mutex_t mutex_create;
+extern pthread_mutex_t mutex_finish;
 
 // ------------------------------------- FUNÇÕES SEMÁFOROS -------------------------------------
 SEMAPHORE_TABLE semaphore_table_init();
@@ -197,7 +199,7 @@ void new_semaphore(char name);
 SEMAPHORE *find_semaphore(char semaphore_name);
 int semaphore_process_exists(char semaphore_name, PROCESS *process);
 void add_semaphore_table(SEMAPHORE *semaphore);
-void P(SEMAPHORE *semaphore, PROCESS *process);
+void P(SEMAPHORE *semaphore);
 void V(SEMAPHORE *semaphore);
 // ---------------------------------------------------------------------------------------------
 
@@ -213,13 +215,15 @@ void run_process(PROCESS *process);
 // ---------------------------------------------------------------------------------------------
 
 // ---------------------------------- FUNÇÕES ENTRADA/SAIDA ------------------------------------
-void print_request(PROCESS_SCHEDULER *process, int duration);
+void print_request(ARGS *args);
+void print_finish(PROCESS *process);
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------ FUNÇÕES DISCO ------------------------------------------
 void disk_init();
 DISK_SCHEDULER disk_scheduler_init();
-void disk_request(PROCESS *process, int track, int flag);
+void disk_request(ARGS *args);
+void disk_finish(PROCESS *process);
 DISK_REQUEST *create_disk_request();
 void add_disk_request(DISK_REQUEST *new_disk_req);
 void remove_disk_request(DISK_REQUEST *req);
@@ -231,6 +235,7 @@ void disk();
 SEGMENT_TABLE segment_table_init();
 void load_memory_page(SEGMENT *segment, int request);
 void memory_load_request(PROCESS *process);
+void memory_load_finish(PROCESS *process);
 void page_request(PROCESS *process, SEGMENT *segment, int request);
 void page_swap(int request);
 void add_segment_table(SEGMENT *segment);
@@ -241,7 +246,7 @@ int find_segment(int segment_id);
 // ------------------------------------- FUNÇÕES SCHEDULER --------------------------------------
 SCHEDULER scheduler_init();
 SCHEDULER add_process_scheduler(PROCESS *process);
-SCHEDULER schedule_process(int flag);
+void schedule_process(int flag);
 void remove_scheduler(PROCESS *process);
 // ---------------------------------------------------------------------------------------------
 
@@ -250,7 +255,7 @@ void print_pcb_processes();
 void print_running_process();
 void print_code(char name[50], char op);
 void print_segment_table();
-void print_disk_usage();
+void print_printing_queue();
 // ---------------------------------------------------------------------------------------------
 
 // ------------------------------------- FUNÇÕES KERNEL ----------------------------------------
